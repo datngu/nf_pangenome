@@ -1,6 +1,8 @@
 process INDEX_GRAPH {
     tag "index"
     label 'vg'
+    memory '128 GB'
+    cpus 16
     publishDir "${params.outdir}/indexes", mode: 'copy'
     
     input:

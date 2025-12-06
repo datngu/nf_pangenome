@@ -2,13 +2,15 @@
 
 ## Pipeline Version
 - **Version**: 1.0
-- **Last Updated**: December 6, 2025
+- **Last Updated**: December 7, 2025
 - **Nextflow DSL**: 2
 - **Minimum Nextflow**: 22.10.0
 
 ## Overview
 
-This pipeline implements state-of-the-art pangenome-based variant calling using the Human Pangenome Reference Consortium (HPRC) graph. It combines vg toolkit for graph alignment, pangenome-aware DeepVariant for SNP/indel calling, and PanGenie for structural variant genotyping.
+This pipeline implements state-of-the-art pangenome-based variant calling using the Human Pangenome Reference Consortium (HPRC) graph. It combines vg Giraffe for graph alignment, Pangenome-Aware DeepVariant for SNP/indel calling, and PanGenie for structural variant genotyping.
+
+**Key Innovation**: Unlike traditional linear-reference pipelines, this uses pangenome graphs incorporating genetic diversity from 94 individuals, reducing reference bias and improving variant calling accuracy, especially for structural variants and complex genomic regions.
 
 ## Key Features
 
@@ -39,16 +41,12 @@ nf_pangenome/
 │   ├── download_graph.nf        # Download HPRC graph
 │   ├── augment_graph.nf         # Add population SVs (optional)
 │   ├── index_graph.nf           # Build graph indexes
-│   ├── giraffe_align.nf         # Align reads to graph
+│   ├── giraffe_align.nf         # Align reads with vg Giraffe
 │   ├── project_bam.nf           # Convert GAM to BAM
-│   ├── call_snps_indels.nf      # DeepVariant variant calling
+│   ├── call_snps_indels.nf      # Pangenome-Aware DeepVariant
 │   ├── call_svs.nf              # PanGenie SV genotyping
 │   └── postprocess.nf           # Merge and filter variants
-└── bin/                         # Helper scripts
-    ├── download_test_data.sh    # Download test data
-    ├── prepare_test.sh          # Setup test environment
-    ├── run_test_saga.sh         # Test on SAGA
-    └── run_test_tsd.sh          # Test on TSD
+└── run_test_saga.sh             # Ready-to-submit SLURM script
 ```
 
 ### Workflow Details
@@ -61,7 +59,7 @@ DOWNLOAD_GRAPH (if not provided)
   ↓ hprc-v1.1-mc-grch38.gbz (~50GB)
   ↓
 AUGMENT_GRAPH (optional)
-  ↓ Add 1KGP SVs to graph
+  ↓ Add 1KGP long-read SVs (2025) to graph
   ↓
 INDEX_GRAPH
   ↓ Build distance & minimizer indexes
@@ -74,8 +72,9 @@ OUTPUT: Indexed graph ready for alignment
 INPUT: sample_name, R1.fq.gz, R2.fq.gz
   ↓
 GIRAFFE_ALIGN
-  ├─ Align reads to pangenome graph
-  ├─ Uses graph-aware alignment algorithm
+  ├─ vg Giraffe: state-of-the-art graph aligner
+  ├─ Leverages haplotype information from 94 genomes
+  ├─ Supports both short and long reads
   └─ Output: sample.gam (graph alignment)
   ↓
 PROJECT_BAM
@@ -88,13 +87,12 @@ PROJECT_BAM
 │                           │
 CALL_SNPS_INDELS       CALL_SVS
 │                           │
-├─ DeepVariant         ├─ PanGenie
-├─ Uses graph          ├─ Genotype known
-├─  context               SVs from graph
-├─ Calls SNPs          └─ Output:
-│   and indels            sample.pg.vcf.gz
-└─ Output:
-   sample.dv.vcf.gz
+├─ Pangenome-Aware     ├─ PanGenie
+├─  DeepVariant        ├─ Genotype known
+├─ Graph-aware DNN     ├─  SVs from graph
+├─ SNPs and indels     ├─ K-mer based
+└─ Output:             └─ Output:
+   sample.dv.vcf.gz       sample.pg.vcf.gz
    sample.dv.g.vcf.gz
 │                           │
 └─────────────┬─────────────┘
@@ -115,28 +113,34 @@ CALL_SNPS_INDELS       CALL_SVS
 
 | Tool | Version | Container | Function |
 |------|---------|-----------|----------|
-| vg | v1.51.0 | quay.io/vgteam/vg:v1.51.0 | Graph construction, indexing, alignment |
-| DeepVariant | pangenome-aware | gcr.io/deepvariant-docker/deepvariant:pangenome_aware_deepvariant-head737001992 | SNP/indel calling with graph context |
-| PanGenie | v3.0.0 | quay.io/biocontainers/pangenie:3.0.0--h7d875b9_0 | SV genotyping from graph |
+| vg (Giraffe) | v1.51.0 | quay.io/vgteam/vg:v1.51.0 | Graph construction, indexing, state-of-the-art graph alignment |
+| Pangenome-Aware DeepVariant | pangenome-aware | gcr.io/deepvariant-docker/deepvariant:pangenome_aware_deepvariant-head737001992 | Graph-aware DNN variant calling (NOT standard DeepVariant) |
+| PanGenie | v3.0.0 | quay.io/biocontainers/pangenie:3.0.0--h7d875b9_0 | SV genotyping from pangenome graph |
 | samtools | v1.18 | quay.io/biocontainers/samtools:1.18--h50ea8bc_1 | BAM manipulation |
 | bcftools | v1.18 | quay.io/biocontainers/bcftools:1.18--h8b25389_0 | VCF manipulation |
 
 ### Tool Descriptions
 
-**vg (variation graph toolkit)**
-- Graph-based reference genome representation
-- Includes Giraffe aligner for fast graph alignment
-- Handles complex genomic variation natively
+**vg Giraffe - State-of-the-art pangenome graph aligner**
+- Latest generation aligner in the vg toolkit
+- Dramatically faster than traditional linear aligners
+- Leverages haplotype information from 94 diverse human genomes
+- Supports both short and long reads with chaining modes
+- Citation: Monlong et al. (2025) bioRxiv https://doi.org/10.1101/2025.09.29.678807
 
-**Pangenome-aware DeepVariant**
-- Extension of Google's DeepVariant
-- Uses graph context to improve variant calling
-- Reduces reference bias in complex regions
+**Pangenome-Aware DeepVariant - Graph-aware deep learning variant caller**
+- **Important**: This is NOT standard DeepVariant - it's a specialized pangenome version
+- Revolutionary deep learning approach specifically designed for pangenome graphs
+- First deep neural network variant caller that natively works with graph structures
+- Significantly improves SNP and indel calling accuracy in complex genomic regions
+- Citation: Chang et al. (2025) medRxiv https://pubmed.ncbi.nlm.nih.gov/40501862/
 
-**PanGenie**
-- Genotypes structural variants from pangenome graphs
+**PanGenie - Pangenome-based SV genotyping**
+- Specialized for structural variant (SV) genotyping using known haplotypes
+- Exploits known haplotype paths through the pangenome graph
 - Uses k-mer counting for efficient genotyping
 - Handles large SVs (>50bp) effectively
+- Citation: Ebler et al. (2022) Nature Genetics https://doi.org/10.1038/s41588-022-01043-w
 
 ## Data Requirements
 
@@ -462,9 +466,29 @@ Contributions welcome! Please:
 ## License
 MIT License - See LICENSE file for details
 
+## Citations
+
+### Core Tools
+
+**vg Giraffe - State-of-the-art pangenome graph alignment:**
+- Monlong, J., Rautiainen, M., Novak, A.M. et al. Giraffe-chaining enables fast and accurate long-read pangenome mapping. *bioRxiv* (2025). https://doi.org/10.1101/2025.09.29.678807
+
+**Pangenome-Aware DeepVariant - Graph-aware deep learning variant caller:**
+- Chang, P.C., Li, H., Monlong, J. et al. Pangenome-aware variant calling using deep learning. *medRxiv* (2025). https://pubmed.ncbi.nlm.nih.gov/40501862/
+- Note: This is a specialized pangenome version, specifically designed for variant calling on pangenome graphs, not the standard linear-reference DeepVariant.
+
+**PanGenie - Pangenome-based SV genotyping:**
+- Ebler, J., Ebert, P., Clarke, W.E. et al. Pangenome-based genome inference allows efficient and accurate genotyping across a wide spectrum of variant classes. *Nature Genetics* **54**, 518–525 (2022). https://doi.org/10.1038/s41588-022-01043-w
+
+**HPRC v1.1 Pangenome:**
+- Liao, W.W., Asri, M., Ebler, J. et al. A draft human pangenome reference. *Nature* **617**, 312–324 (2023). https://doi.org/10.1038/s41586-023-05896-x
+
+**1000 Genomes Project Long-Read SV Dataset (optional augmentation):**
+- Ebert, P., Audano, P.A., Zhu, Q. et al. Haplotype-resolved diverse human genomes and integrated analysis of structural variation. *Nature* **637**, 696–706 (2025). https://doi.org/10.1038/s41586-025-09290-7
+
 ## Acknowledgments
 - HPRC Consortium for pangenome resources
 - vg team for toolkit and support
-- Google DeepVariant team
+- Google Health Genomics team for Pangenome-Aware DeepVariant
 - PanGenie developers
 - Norwegian HPC infrastructure (SAGA/TSD)
