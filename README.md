@@ -1,10 +1,39 @@
 # Pangenome Variant Calling Pipeline
 
-A streamlined Nextflow pipeline for pangenome-based variant calling using HPRC v1.1 graphs, pangenome-aware DeepVariant, and PanGenie. Designed for SAGA and TSD HPC environments with Singularity containers.
+A state-of-the-art Nextflow pipeline for pangenome-based variant calling using HPRC v1.1 graphs, pangenome-aware DeepVariant, and PanGenie. Designed for SAGA and TSD HPC environments with Singularity containers.
 
 ## Overview
 
-This pipeline performs comprehensive variant calling (SNPs, indels, and SVs) by aligning sequencing reads to the Human Pangenome Reference Consortium (HPRC) graph instead of a linear reference genome. This approach improves variant calling accuracy, especially in complex genomic regions and for structural variants.
+### Why Pangenome-Based Variant Calling?
+
+Traditional variant calling pipelines align sequencing reads to a single linear reference genome (e.g., GRCh38), which introduces **reference bias** and limits our ability to detect variants in structurally complex regions. This pipeline represents a **paradigm shift** by using pangenome graphs that incorporate genetic diversity from multiple individuals, enabling more accurate and comprehensive variant discovery.
+
+### State-of-the-Art Technology Stack
+
+This pipeline integrates three cutting-edge tools, each representing the latest advances in genomic analysis:
+
+1. **vg Giraffe** - Ultra-fast pangenome graph alignment
+   - Latest generation of the vg toolkit for variation graph analysis
+   - Dramatically faster than traditional linear aligners while maintaining high accuracy
+   - Leverages haplotype information from 94 diverse human genomes in HPRC v1.1
+
+2. **Pangenome-Aware DeepVariant** - Graph-aware deep learning variant caller
+   - Revolutionary extension of Google's DeepVariant using deep neural networks
+   - First variant caller specifically designed to work with pangenome graphs
+   - Significantly improves accuracy in complex genomic regions compared to linear-reference approaches
+
+3. **PanGenie** - Kmer-based pangenome genotyping
+   - Specialized for structural variant (SV) genotyping using known haplotypes
+   - Exploits known haplotype paths through the pangenome graph
+   - Provides accurate genotypes for large and complex structural variants
+
+### Key Advantages Over Linear-Reference Pipelines
+
+✨ **Improved Accuracy**: Reduces reference bias by incorporating diverse human genetic variation  
+✨ **Better SV Calling**: Dramatically improved detection and genotyping of structural variants  
+✨ **Complex Region Resolution**: Enhanced performance in segmental duplications, HLA, and other challenging loci  
+✨ **Population-Aware**: Leverages population-scale haplotype information for more informed variant calls  
+✨ **State-of-the-Art Methods**: Combines the latest advances in graph genomics and machine learning
 
 **Key Features:**
 - Multi-sample processing via CSV input
@@ -843,14 +872,40 @@ A: Yes! The HPRC graph in `test_data/` can be used for production runs. Just poi
 **Q: Do I need to download data every time?**  
 A: No. Once downloaded, the pipeline reuses cached data. The graph, containers, and reference are all cached.
 
-## Citation
+## Citations
 
-If you use this pipeline, please cite:
+If you use this pipeline, please cite the following papers:
 
-- **vg toolkit**: Garrison et al. (2018) Nature Biotechnology
-- **DeepVariant**: Poplin et al. (2018) Nature Biotechnology  
-- **PanGenie**: Ebler et al. (2022) Nature Genetics
-- **HPRC**: Liao et al. (2023) Nature
+### Core Tools
+
+**vg toolkit and vg Giraffe:**
+- Garrison, E., Sirén, J., Novak, A.M. et al. Variation graph toolkit improves read mapping by representing genetic variation in the reference. *Nature Biotechnology* **36**, 875–879 (2018). https://doi.org/10.1038/nbt.4227
+- Sirén, J., Monlong, J., Chang, X. et al. Pangenomics enables genotyping of known structural variants in 5202 diverse genomes. *Science* **374**(6574), eabg8871 (2021). https://doi.org/10.1126/science.abg8871
+
+**DeepVariant (original):**
+- Poplin, R., Chang, P.C., Alexander, D. et al. A universal SNP and small-indel variant caller using deep neural networks. *Nature Biotechnology* **36**, 983–987 (2018). https://doi.org/10.1038/nbt.4235
+
+**Pangenome-Aware DeepVariant:**
+- See the latest documentation at: https://github.com/google/deepvariant/blob/r1.9/docs/deepvariant-vg-case-study.md
+- Docker container: `gcr.io/deepvariant-docker/deepvariant:pangenome_aware_deepvariant`
+
+**PanGenie:**
+- Ebler, J., Ebert, P., Clarke, W.E. et al. Pangenome-based genome inference allows efficient and accurate genotyping across a wide spectrum of variant classes. *Nature Genetics* **54**, 518–525 (2022). https://doi.org/10.1038/s41588-022-01043-w
+
+**HPRC v1.1 Pangenome:**
+- Liao, W.W., Asri, M., Ebler, J. et al. A draft human pangenome reference. *Nature* **617**, 312–324 (2023). https://doi.org/10.1038/s41586-023-05896-x
+
+### Data Resources
+
+**HPRC Pangenome Resources:**
+- GitHub: https://github.com/human-pangenomics/hpp_pangenome_resources
+- Graph files: https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html
+
+**Tool Repositories:**
+- vg toolkit: https://github.com/vgteam/vg
+- DeepVariant: https://github.com/google/deepvariant
+- PanGenie: https://github.com/eblerjana/pangenie
+- Nextflow: https://www.nextflow.io/
 
 ## Helper Scripts in bin/ (Optional)
 
@@ -869,14 +924,6 @@ bash bin/run_test_tsd.sh          # Runs pipeline on TSD interactively
 - **`bin/run_test_saga.sh`**: Interactive shell script (runs in current session)
 
 Use the top-level sbatch script for actual HPC runs!
-
-## References & Links
-
-- **HPRC Resources**: https://github.com/human-pangenomics/hpp_pangenome_resources
-- **vg toolkit**: https://github.com/vgteam/vg
-- **DeepVariant**: https://github.com/google/deepvariant
-- **PanGenie**: https://github.com/eblerjana/pangenie
-- **Nextflow**: https://www.nextflow.io/
 
 ## Support
 
