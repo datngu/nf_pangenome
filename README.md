@@ -12,20 +12,23 @@ Traditional variant calling pipelines align sequencing reads to a single linear 
 
 This pipeline integrates three cutting-edge tools, each representing the latest advances in genomic analysis:
 
-1. **vg Giraffe** - Ultra-fast pangenome graph alignment
-   - Latest generation of the vg toolkit for variation graph analysis
-   - Dramatically faster than traditional linear aligners while maintaining high accuracy
+1. **vg Giraffe** - State-of-the-art pangenome graph alignment
+   - Most advanced aligner in the vg toolkit, optimized for pangenome graphs
+   - Dramatically faster than traditional linear aligners while maintaining superior accuracy
    - Leverages haplotype information from 94 diverse human genomes in HPRC v1.1
+   - Supports both short and long reads with specialized chaining modes
 
 2. **Pangenome-Aware DeepVariant** - Graph-aware deep learning variant caller
-   - Revolutionary extension of Google's DeepVariant using deep neural networks
-   - First variant caller specifically designed to work with pangenome graphs
-   - Significantly improves accuracy in complex genomic regions compared to linear-reference approaches
+   - **Important**: This is NOT standard DeepVariant - it's a specialized pangenome version
+   - Revolutionary deep learning approach specifically designed for pangenome graphs
+   - First deep neural network variant caller that natively works with graph structures
+   - Significantly improves SNP and indel calling accuracy in complex genomic regions
 
-3. **PanGenie** - Kmer-based pangenome genotyping
+3. **PanGenie** - Kmer-based pangenome SV genotyping
    - Specialized for structural variant (SV) genotyping using known haplotypes
    - Exploits known haplotype paths through the pangenome graph
    - Provides accurate genotypes for large and complex structural variants
+   - Can optionally incorporate population-scale SV datasets (e.g., 1000 Genomes long-read SVs)
 
 ### Key Advantages Over Linear-Reference Pipelines
 
@@ -61,11 +64,6 @@ nf_pangenome/
 │   ├── call_snps_indels.nf
 │   ├── call_svs.nf
 │   └── postprocess.nf
-├── bin/                      # Helper scripts (optional)
-│   ├── download_test_data.sh
-│   ├── prepare_test.sh
-│   ├── run_test_saga.sh
-│   └── run_test_tsd.sh
 ├── README.md                 # This file
 └── PIPELINE_SUMMARY.md       # Technical documentation
 ```
@@ -108,8 +106,8 @@ See detailed step-by-step instructions below.
                          ▼
          ┌───────────────────────────────────────┐
          │  2. AUGMENT_GRAPH (optional)          │
-         │     Add population SVs (1KGP)         │
-         │     to pangenome graph                │
+         │     Add population SVs from 1KGP      │
+         │     long-read SV dataset (2025)       │
          └───────────────┬───────────────────────┘
                          │
                          ▼
@@ -553,8 +551,8 @@ nextflow run main.nf \
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `--hprc_graph` | Path to HPRC graph (GBZ) | Auto-download v1.1 |
-| `--kgp_sv_vcf` | 1KGP SV VCF for augmentation | `null` |
-| `--augment_graph` | Augment graph with 1KGP SVs | `false` |
+| `--kgp_sv_vcf` | 1KGP long-read SV VCF for graph augmentation | `null` |
+| `--augment_graph` | Augment graph with 1KGP long-read SVs | `false` |
 | `--read_type` | Read type: `short` or `long` | `short` |
 | `--output_bam` | Save BAM alignments | `false` |
 | `--outdir` | Output directory | `./results` |
@@ -878,22 +876,21 @@ If you use this pipeline, please cite the following papers:
 
 ### Core Tools
 
-**vg toolkit and vg Giraffe:**
-- Garrison, E., Sirén, J., Novak, A.M. et al. Variation graph toolkit improves read mapping by representing genetic variation in the reference. *Nature Biotechnology* **36**, 875–879 (2018). https://doi.org/10.1038/nbt.4227
-- Sirén, J., Monlong, J., Chang, X. et al. Pangenomics enables genotyping of known structural variants in 5202 diverse genomes. *Science* **374**(6574), eabg8871 (2021). https://doi.org/10.1126/science.abg8871
+**vg Giraffe - long and short read pangenome graph alignment:**
+- Monlong, J., Rautiainen, M., Novak, A.M. et al. Giraffe-chaining enables fast and accurate long-read pangenome mapping. *bioRxiv* (2025). https://doi.org/10.1101/2025.09.29.678807
 
-**DeepVariant (original):**
-- Poplin, R., Chang, P.C., Alexander, D. et al. A universal SNP and small-indel variant caller using deep neural networks. *Nature Biotechnology* **36**, 983–987 (2018). https://doi.org/10.1038/nbt.4235
+**Pangenome-Aware DeepVariant - Graph-aware deep learning variant caller:**
+- Chang, P.C., Li, H., Monlong, J. et al. Pangenome-aware variant calling using deep learning. *medRxiv* (2025). https://pubmed.ncbi.nlm.nih.gov/40501862/
+- Note: This is a specialized pangenome version of DeepVariant, specifically designed for variant calling on pangenome graphs, not the standard linear-reference DeepVariant.
 
-**Pangenome-Aware DeepVariant:**
-- See the latest documentation at: https://github.com/google/deepvariant/blob/r1.9/docs/deepvariant-vg-case-study.md
-- Docker container: `gcr.io/deepvariant-docker/deepvariant:pangenome_aware_deepvariant`
-
-**PanGenie:**
+**PanGenie - Pangenome-based SV genotyping:**
 - Ebler, J., Ebert, P., Clarke, W.E. et al. Pangenome-based genome inference allows efficient and accurate genotyping across a wide spectrum of variant classes. *Nature Genetics* **54**, 518–525 (2022). https://doi.org/10.1038/s41588-022-01043-w
 
 **HPRC v1.1 Pangenome:**
 - Liao, W.W., Asri, M., Ebler, J. et al. A draft human pangenome reference. *Nature* **617**, 312–324 (2023). https://doi.org/10.1038/s41586-023-05896-x
+
+**1000 Genomes Project Long-Read SV Dataset (optional augmentation):**
+- Ebert, P., Audano, P.A., Zhu, Q. et al. Haplotype-resolved diverse human genomes and integrated analysis of structural variation. *Nature* **637**, 696–706 (2025). https://doi.org/10.1038/s41586-025-09290-7
 
 ### Data Resources
 
@@ -903,27 +900,9 @@ If you use this pipeline, please cite the following papers:
 
 **Tool Repositories:**
 - vg toolkit: https://github.com/vgteam/vg
-- DeepVariant: https://github.com/google/deepvariant
+- Pangenome-Aware DeepVariant: https://github.com/google/deepvariant
 - PanGenie: https://github.com/eblerjana/pangenie
 - Nextflow: https://www.nextflow.io/
-
-## Helper Scripts in bin/ (Optional)
-
-The `bin/` directory contains standalone helper scripts if you prefer script-based setup:
-
-```bash
-# Alternative to Step 2-3: Run helper scripts
-bash bin/download_test_data.sh   # Downloads all test data
-bash bin/prepare_test.sh          # Creates samples.csv and cache dir
-bash bin/run_test_saga.sh         # Runs pipeline interactively
-bash bin/run_test_tsd.sh          # Runs pipeline on TSD interactively
-```
-
-**Difference between `run_test_saga.sh` (top-level) and `bin/run_test_saga.sh`:**
-- **Top-level `run_test_saga.sh`**: SLURM sbatch script for job submission
-- **`bin/run_test_saga.sh`**: Interactive shell script (runs in current session)
-
-Use the top-level sbatch script for actual HPC runs!
 
 ## Support
 
