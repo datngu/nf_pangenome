@@ -212,8 +212,6 @@ echo "Download Complete!"
 echo "=========================================="
 ls -lh test_data/
 
-# Return to main directory
-cd ..
 ```
 
 ### Step 3: Prepare Sample Sheet
