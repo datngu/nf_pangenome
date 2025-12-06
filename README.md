@@ -14,6 +14,52 @@ This pipeline performs comprehensive variant calling (SNPs, indels, and SVs) by 
 - Automatic HPRC v1.1 graph download
 - Singularity containers for reproducibility
 - Optimized for SAGA and TSD HPC systems
+- **Ready-to-submit SLURM script** (`run_test_saga.sh`)
+
+## Repository Structure
+
+```
+nf_pangenome/
+├── run_test_saga.sh         # ⭐ Ready-to-submit SLURM script
+├── main.nf                   # Main workflow
+├── nextflow.config           # Configuration (SAGA/TSD profiles)
+├── modules/                  # Pipeline processes
+│   ├── download_graph.nf
+│   ├── augment_graph.nf
+│   ├── index_graph.nf
+│   ├── giraffe_align.nf
+│   ├── project_bam.nf
+│   ├── call_snps_indels.nf
+│   ├── call_svs.nf
+│   └── postprocess.nf
+├── bin/                      # Helper scripts (optional)
+│   ├── download_test_data.sh
+│   ├── prepare_test.sh
+│   ├── run_test_saga.sh
+│   └── run_test_tsd.sh
+├── README.md                 # This file
+└── PIPELINE_SUMMARY.md       # Technical documentation
+```
+
+## Quick Test on SAGA (TL;DR)
+
+If you just want to run a quick test:
+
+```bash
+# 1. Clone repository
+git clone https://github.com/datngu/nf_pangenome.git
+cd nf_pangenome
+
+# 2. Download test data (see Step 2 below - copy/paste commands) - ~55 GB
+# 3. Prepare samples.csv (see Step 3 below - copy/paste commands)
+
+# 4. Submit job
+sbatch run_test_saga.sh
+
+# Done! Check results in results_test/
+```
+
+See detailed step-by-step instructions below.
 
 ## Pipeline Workflow
 
@@ -96,55 +142,171 @@ This pipeline performs comprehensive variant calling (SNPs, indels, and SVs) by 
          └────────────────────────────────────────┘
 ```
 
-## Quick Start
+## Quick Start - Test Pipeline
 
-### Prepare Input CSV
+Follow these steps to download test data and run the pipeline on SAGA:
 
-Create a `samples.csv` file with your samples:
-```csv
+### Step 1: Clone Repository
+
+```bash
+git clone https://github.com/datngu/nf_pangenome.git
+cd nf_pangenome
+```
+
+### Step 2: Download Test Data (~55 GB total)
+
+Copy and paste these commands to download reference genome, HPRC graph, and NA12878 test reads:
+
+```bash
+# Create test data directory
+mkdir -p test_data
+cd test_data
+
+# 1. Download GRCh38 full reference genome
+echo "Downloading GRCh38 reference genome..."
+wget -O GRCh38.fa.gz \
+    "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz"
+
+gunzip GRCh38.fa.gz
+
+# Index reference (optional but recommended)
+module load SAMtools/1.17-GCC-12.2.0
+samtools faidx GRCh38.fa
+
+echo "✓ GRCh38 reference genome ready"
+
+# 2. Download HPRC v1.1 pangenome graph (~50GB - this takes time!)
+echo "Downloading HPRC v1.1 graph (~50GB)..."
+wget --progress=bar:force \
+    -O hprc-v1.1-mc-grch38.gbz \
+    "https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38/hprc-v1.1-mc-grch38.gbz"
+
+echo "✓ HPRC v1.1 graph downloaded"
+
+# 3. Download NA12878 test reads from Zenodo
+echo "Downloading NA12878 200M coverage reads..."
+wget --progress=bar:force \
+    -O A006850052_NA12878_200M_R1.fq.gz \
+    "https://zenodo.org/records/6513789/files/A006850052_NA12878_200M_R1.fq.gz?download=1"
+
+wget --progress=bar:force \
+    -O A006850052_NA12878_200M_R2.fq.gz \
+    "https://zenodo.org/records/6513789/files/A006850052_NA12878_200M_R2.fq.gz?download=1"
+
+echo "Downloading NA12878 75M coverage reads..."
+wget --progress=bar:force \
+    -O A006850052_NA12878_75M_R1.fq.gz \
+    "https://zenodo.org/records/6513789/files/A006850052_NA12878_75M_R1.fq.gz?download=1"
+
+wget --progress=bar:force \
+    -O A006850052_NA12878_75M_R2.fq.gz \
+    "https://zenodo.org/records/6513789/files/A006850052_NA12878_75M_R2.fq.gz?download=1"
+
+echo "✓ NA12878 reads downloaded"
+
+# Return to main directory
+cd ..
+
+echo "=========================================="
+echo "Download Complete!"
+echo "=========================================="
+ls -lh test_data/
+
+# Return to main directory
+cd ..
+```
+
+### Step 3: Prepare Sample Sheet
+
+```bash
+# Create samples.csv with test data (use absolute paths)
+cat > samples.csv << EOF
 sample,read1,read2
-sample1,/path/to/sample1_R1.fq.gz,/path/to/sample1_R2.fq.gz
-sample2,/path/to/sample2_R1.fq.gz,/path/to/sample2_R2.fq.gz
-sample3,/path/to/sample3_R1.fq.gz,/path/to/sample3_R2.fq.gz
-```
+NA12878_200M,${PWD}/test_data/A006850052_NA12878_200M_R1.fq.gz,${PWD}/test_data/A006850052_NA12878_200M_R2.fq.gz
+NA12878_75M,${PWD}/test_data/A006850052_NA12878_75M_R1.fq.gz,${PWD}/test_data/A006850052_NA12878_75M_R2.fq.gz
+EOF
 
-### Basic Run on SAGA
+echo "✓ samples.csv created with absolute paths"
+cat samples.csv
 
-```bash
-# Set cache directory to avoid filling $HOME
-export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
+# Create Singularity cache directory
 mkdir -p singularity_cache
 
-# Load Nextflow
+echo "✓ Setup complete! Ready to submit job."
+```
+
+**Note:** The sbatch script (`run_test_saga.sh`) handles all environment setup automatically - no manual exports needed!
+
+### Step 4: Submit Test Job to SAGA
+
+Simply submit the included sbatch script:
+
+```bash
+sbatch run_test_saga.sh
+```
+
+The sbatch script will automatically:
+- Load Nextflow/24.04.2 module
+- Set Singularity cache to `singularity_cache/` (avoids filling $HOME)
+- Verify test data and samples.csv exist
+- Run pipeline with full genome reference
+- Output results to `results_test/`
+- Create log file: `nf_pangenome_test_<jobid>.log`
+
+**Monitor the job:**
+```bash
+squeue -u $USER
+```
+
+**Check log file:**
+```bash
+tail -f nf_pangenome_test_*.log
+```
+
+### Alternative: Run Interactively on SAGA
+
+If you prefer to run interactively (not recommended for full runs):
+
+```bash
+# Request interactive session
+salloc --account=nn9114k --time=24:00:00 --mem=8G --cpus-per-task=2
+
+# Load modules
 module load Nextflow/24.04.2
+
+# Set cache
+export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
 
 # Run pipeline
 nextflow run main.nf \
     --input_csv samples.csv \
-    --reference GRCh38.fa \
-    --outdir results \
-    -profile saga
+    --reference test_data/GRCh38.fa \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --outdir results_test \
+    -profile saga \
+    -resume
 ```
 
-### Basic Run on TSD
+### Step 5: Check Results
+
+After the pipeline completes:
 
 ```bash
-# Set cache directory
-export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
-mkdir -p singularity_cache
+# Check output structure
+ls -lh results_test/
 
-# Load Nextflow
-module load Nextflow/24.04.2
+# Check final variants
+ls -lh results_test/final/
 
-# Run pipeline
-nextflow run main.nf \
-    --input_csv samples.csv \
-    --reference GRCh38.fa \
-    --outdir results \
-    -profile tsd
+# View variant counts
+zcat results_test/final/NA12878_200M.merged.vcf.gz | grep -v "^#" | wc -l
 ```
+
+---
 
 ## Production Data Setup
+
+> **Note:** If you've completed the test run above, you already have the HPRC graph and reference downloaded in `test_data/`. You can reuse these files for production runs!
 
 ### Step-by-Step: Preparing Your Own Data
 
@@ -220,15 +382,11 @@ EOF
 ```bash
 # Create cache directory in working dir (not $HOME!)
 mkdir -p singularity_cache
+```
 
-# Set environment variable
+**Note:** When running pipeline, you'll need to set the cache location:
+```bash
 export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
-export NXF_SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
-
-# Save to file for later use
-echo "export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache" > run_env.sh
-echo "export NXF_SINGULARITY_CACHEDIR=$(pwd)/singularity_cache" >> run_env.sh
-chmod +x run_env.sh
 ```
 
 #### 6. Load Nextflow Module
@@ -245,21 +403,31 @@ module load Nextflow/24.04.2
 
 #### 7. Run Pipeline
 
-**Basic run with auto-downloaded graph:**
+**Option A: Using test data graph (recommended - reuse downloaded graph):**
 ```bash
-source run_env.sh
+# Set cache location
+export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
 
+# Create production samples.csv with your data
+cat > samples_production.csv << EOF
+sample,read1,read2
+patient001,/full/path/to/patient001_R1.fastq.gz,/full/path/to/patient001_R2.fastq.gz
+patient002,/full/path/to/patient002_R1.fastq.gz,/full/path/to/patient002_R2.fastq.gz
+EOF
+
+# Run with downloaded test data graph
 nextflow run main.nf \
-    --input_csv samples.csv \
-    --reference reference/GRCh38.fa \
+    --input_csv samples_production.csv \
+    --reference test_data/GRCh38.fa \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
     --outdir results \
     -profile saga \
     -resume
 ```
 
-**With local graph (faster):**
+**Option B: With separately downloaded graph:**
 ```bash
-source run_env.sh
+export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
 
 nextflow run main.nf \
     --input_csv samples.csv \
@@ -270,18 +438,61 @@ nextflow run main.nf \
     -resume
 ```
 
-**With graph augmentation (1KGP SVs):**
+**Option C: Auto-download graph (slower first run):**
 ```bash
-source run_env.sh
+export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
 
 nextflow run main.nf \
     --input_csv samples.csv \
     --reference reference/GRCh38.fa \
-    --hprc_graph graphs/hprc-v1.1-mc-grch38.gbz \
+    --outdir results \
+    -profile saga \
+    -resume
+```
+
+**Option D: With graph augmentation (add 1KGP SVs):**
+```bash
+export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
+
+nextflow run main.nf \
+    --input_csv samples.csv \
+    --reference test_data/GRCh38.fa \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
     --kgp_sv_vcf 1KGP_SVs.vcf.gz \
     --augment_graph true \
     --outdir results \
     -profile saga \
+    -resume
+```
+
+#### 8. For TSD: Create Production Sbatch Script
+
+If running on TSD, modify the test script for production:
+
+```bash
+# Copy the test script
+cp run_test_saga.sh run_production_tsd.sh
+
+# Edit run_production_tsd.sh to change:
+# Line 3: #SBATCH --account=p33_norment
+# Line 56: -profile tsd
+# Update --input_csv to your production samples.csv
+
+# Then submit
+sbatch run_production_tsd.sh
+```
+
+**Or run interactively:**
+```bash
+export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
+module load Nextflow/24.04.2
+
+nextflow run main.nf \
+    --input_csv samples.csv \
+    --reference test_data/GRCh38.fa \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --outdir results \
+    -profile tsd \
     -resume
 ```
 
@@ -571,6 +782,43 @@ nextflow run main.nf --input_csv samples.csv ... -resume
 - Per sample output: ~2-5 GB (compressed VCFs)
 - Plan accordingly for multiple samples!
 
+## SLURM Batch Script Details
+
+The repository includes `run_test_saga.sh` - a ready-to-use SLURM sbatch script for SAGA:
+
+**Script configuration:**
+- Job name: `nf_pangenome_test`
+- Account: `nn9114k`
+- Time limit: 24 hours
+- Resources: 2 CPUs, 8 GB RAM (for Nextflow orchestration only)
+- Singularity cache: Uses `singularity_cache/` in working directory
+
+**What it does:**
+1. Loads Nextflow/24.04.2 module
+2. Sets Singularity cache directory
+3. Verifies test data exists
+4. Runs Nextflow pipeline with `-resume` support
+5. Outputs log to `nf_pangenome_test_<jobid>.log`
+
+**To customize for production:**
+```bash
+# Copy the script
+cp run_test_saga.sh run_production.sh
+
+# Edit these variables:
+# - Change samples.csv to your data
+# - Change reference to full GRCh38 (if not using chr22)
+# - Change --outdir as needed
+# - Adjust time/memory if needed
+
+sbatch run_production.sh
+```
+
+**For TSD users:**
+Create a similar script but change:
+- Account: `p33_norment`
+- Profile: `-profile tsd`
+
 ## FAQ
 
 **Q: Can I use GRCh37/hg19 reference?**  
@@ -591,6 +839,12 @@ A: Not currently supported. Pipeline processes whole genome.
 **Q: What's the difference from linear reference pipeline?**  
 A: Pangenome approach improves accuracy in complex regions, better SV calling, reduces reference bias.
 
+**Q: Can I reuse test data for production?**  
+A: Yes! The HPRC graph in `test_data/` can be used for production runs. Just point to it with `--hprc_graph test_data/hprc-v1.1-mc-grch38.gbz`
+
+**Q: Do I need to download data every time?**  
+A: No. Once downloaded, the pipeline reuses cached data. The graph, containers, and reference are all cached.
+
 ## Citation
 
 If you use this pipeline, please cite:
@@ -599,6 +853,24 @@ If you use this pipeline, please cite:
 - **DeepVariant**: Poplin et al. (2018) Nature Biotechnology  
 - **PanGenie**: Ebler et al. (2022) Nature Genetics
 - **HPRC**: Liao et al. (2023) Nature
+
+## Helper Scripts in bin/ (Optional)
+
+The `bin/` directory contains standalone helper scripts if you prefer script-based setup:
+
+```bash
+# Alternative to Step 2-3: Run helper scripts
+bash bin/download_test_data.sh   # Downloads all test data
+bash bin/prepare_test.sh          # Creates samples.csv and cache dir
+bash bin/run_test_saga.sh         # Runs pipeline interactively
+bash bin/run_test_tsd.sh          # Runs pipeline on TSD interactively
+```
+
+**Difference between `run_test_saga.sh` (top-level) and `bin/run_test_saga.sh`:**
+- **Top-level `run_test_saga.sh`**: SLURM sbatch script for job submission
+- **`bin/run_test_saga.sh`**: Interactive shell script (runs in current session)
+
+Use the top-level sbatch script for actual HPC runs!
 
 ## References & Links
 
@@ -611,10 +883,34 @@ If you use this pipeline, please cite:
 ## Support
 
 For issues and questions:
-- Pipeline issues: Open GitHub issue
+- Pipeline issues: Open GitHub issue at https://github.com/datngu/nf_pangenome
 - SAGA support: support@metacenter.no
 - TSD support: tsd-drift@usit.uio.no
 
 ## License
 
 MIT License - See LICENSE file for details.
+
+---
+
+## Quick Reference Card
+
+**Test run on SAGA:**
+```bash
+git clone https://github.com/datngu/nf_pangenome.git && cd nf_pangenome
+# Download test data (Step 2), prepare CSV (Step 3)
+sbatch run_test_saga.sh
+```
+
+**Production run on SAGA:**
+```bash
+export SINGULARITY_CACHEDIR=$(pwd)/singularity_cache
+module load Nextflow/24.04.2
+nextflow run main.nf --input_csv samples.csv --reference test_data/GRCh38.fa --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz -profile saga -resume
+```
+
+**Check results:**
+```bash
+ls -lh results_test/final/
+zcat results_test/final/NA12878_200M.merged.vcf.gz | grep -v "^#" | wc -l
+```

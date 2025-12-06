@@ -1,0 +1,29 @@
+# Nextflow
+work/
+.nextflow/
+.nextflow.log*
+
+# Results
+results/
+output/
+
+# Test data
+test_data/
+*.fastq
+*.fastq.gz
+*.bam
+*.bai
+*.gbz
+*.gfa
+*.vcf
+*.vcf.gz
+*.vcf.gz.tbi
+*.fa
+*.fasta
+*.fna
+
+# Singularity
+.singularity/
+
+# Other
+.DS_Store
