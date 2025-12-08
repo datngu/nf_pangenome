@@ -55,18 +55,17 @@ process INDEX_GRAPH {
     memory '128 GB'
     cpus 16
 
-
     publishDir "${params.outdir}/indexes", mode: 'copy'
     
     input:
     path graph
 
-
     output:
     path "index.gbz", emit: gbz
     path "index.dist", emit: dist
     path "index.min", emit: min
-    tuple path("index.gbz"), path("index.dist"), path("index.min"), emit: indexes
+    path "index.zipcodes", emit: zipcodes
+    tuple path("index.gbz"), path("index.dist"), path("index.min"), path("index.zipcodes"), emit: indexes
     
     script:
     """
@@ -74,10 +73,10 @@ process INDEX_GRAPH {
     cp ${graph} index.gbz
     
     # Build distance index
-    vg index -j index.dist index.gbz
+    vg index -t ${task.cpus} -j index.dist index.gbz
     
-    # Build minimizer index
-    vg minimizer -k 29 -w 11 -g index.gbz -d index.dist -o index.min
+    # Build minimizer index with zipcodes
+    vg minimizer -t ${task.cpus} -d index.dist -o index.min -z index.zipcodes index.gbz
     """
 }
 
@@ -92,13 +91,11 @@ process GIRAFFE_ALIGN {
     memory '64 GB'
     cpus 16
 
-
     publishDir "${params.outdir}/alignments/${sample}", mode: 'copy', pattern: "*.gam"
     
     input:
     tuple val(sample), path(read1), path(read2)
-    tuple path(gbz), path(dist), path(min)
-
+    tuple path(gbz), path(dist), path(min), path(zipcodes)
 
     output:
     tuple val(sample), path("${sample}.gam"), emit: gam
@@ -109,12 +106,14 @@ process GIRAFFE_ALIGN {
         -Z ${gbz} \
         -d ${dist} \
         -m ${min} \
+        -z ${zipcodes} \
         -f ${read1} -f ${read2} \
         -t ${task.cpus} \
         --sample ${sample} \
         > ${sample}.gam
     """
 }
+
 
 
 
