@@ -24,7 +24,7 @@ nextflow run main.nf \
     --reference test_data/GRCh38.fa \
     --graph test_data/hprc-v1.1-mc-grch38.gbz \
     --outdir test_results_pangenie \
-    -profile saga \
+    -profile saga,singularity \
     -resume
 
 echo "✓ Pipeline finished!"
