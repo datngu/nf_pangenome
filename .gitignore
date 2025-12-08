@@ -16,8 +16,8 @@ test_data/
 *.gbz
 *.gfa
 *.vcf
-*.vcf.gz
-*.vcf.gz.tbi
+#*.vcf.gz
+#*.vcf.gz.tbi
 *.fa
 *.fasta
 *.fna

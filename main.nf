@@ -15,6 +15,7 @@
 */ 
 params.genome          = "$baseDir/test_data/GRCh38.fa"
 params.hprc_graph      = "$baseDir/test_data/hprc-v1.1-mc-grch38.gbz"
+params.phased_vcf      = "$baseDir/data/1000GP_ONT_shapeit5-phased-callset_final-vcf.phased.vcf.gz"
 params.meta_csv        = "$baseDir/samples.csv"
 params.outdir          = "test_results"
 
@@ -40,7 +41,35 @@ process EXTRACT_VCF_FROM_GRAPH {
     """
 }
 
+
+
+process PANGENIE_INDEX {
+    tag "PanGenie_index"
+    container 'docker://mgibio/pangenie:v4.2.1-bookworm'
+    memory '128 GB'
+    cpus 16
+
+    publishDir "${params.outdir}/pangenie_index", mode: 'copy'
+    
+    input:
+    path vcf
+    path reference
+
+    output:
+    path "pangenie_index*", emit: pangenie_index
+    
+    script:
+    """
+    PanGenie-index -v ${vcf} -r ${reference} -o pangenie_index -t ${task.cpus}
+    """
+}
+
+
 workflow {
     graph_ch = Channel.fromPath(params.hprc_graph)
+    genome_ch = Channel.fromPath(params.genome)
+
     EXTRACT_VCF_FROM_GRAPH(graph_ch)
+    PANGENIE_INDEX(EXTRACT_VCF_FROM_GRAPH.out.vcf, genome_ch)
+
 }
