@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=pangenie_test
+#SBATCH --job-name=deep_variant_test
 #SBATCH --account=nn9114k
 #SBATCH --time=8:00:00
 #SBATCH --mem=8G
 #SBATCH --cpus-per-task=1
-#SBATCH --output=pangenie_test_%j.log
+#SBATCH --output=deep_variant_test_%j.log
 
 # Load Nextflow
 module load Nextflow/24.04.2
