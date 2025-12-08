@@ -19,14 +19,12 @@ export SINGULARITY_TMPDIR="/cluster/projects/nn9114k/datngu/singularity/tmp"
 ## singularity build vg_v1.65.0.sif docker://quay.io/vgteam/vg:v1.65.0
 
 
-
-
 nextflow run main.nf \
     --input_csv samples.csv \
-    --reference reference.fa \
-    --phased_vcf data/1000GP_ONT_shapeit5-phased-callset_final-vcf.phased.vcf.gz \
-    --outdir results_pangenie \
+    --reference test_data/GRCh38.fa \
+    --graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --outdir test_results_pangenie \
     -profile saga \
     -resume
 
-echo "Pipeline completed!"
+echo "✓ Pipeline finished!"
