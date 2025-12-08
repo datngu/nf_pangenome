@@ -32,13 +32,11 @@ process EXTRACT_VCF_FROM_GRAPH {
     path graph
 
     output:
-    path "hprc_graph.vcf.gz", emit: vcf
-    path "hprc_graph.vcf.gz.tbi", emit: vcf_idx
+    path "hprc_graph.vcf", emit: vcf
     
     script:
     """
-    vg deconstruct -P "GRCh38#0#" -e -a -t ${task.cpus} ${graph} | bgzip > hprc_graph.vcf.gz
-    tabix -p vcf hprc_graph.vcf.gz
+    vg deconstruct -P "GRCh38#0#" -e -a -t ${task.cpus} ${graph} > hprc_graph.vcf
     """
 }
 
