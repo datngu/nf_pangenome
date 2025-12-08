@@ -20,14 +20,14 @@ export SINGULARITY_TMPDIR="/cluster/projects/nn9114k/datngu/singularity/tmp"
 ## set Nextflow Singularity cache directory
 export NXF_SINGULARITY_CACHEDIR="/cluster/projects/nn9114k/datngu/singularity"
 
-## singularity build vg_v1.65.0.sif docker://quay.io/vgteam/vg:v1.65.0
+## singularity build quay.io-vgteam-vg-v1.65.0.img docker://quay.io/vgteam/vg:v1.65.0
 
 
-nextflow run main.nf \
+nextflow run main2.nf \
     --input_csv samples.csv \
     --reference test_data/GRCh38.fa \
     --graph test_data/hprc-v1.1-mc-grch38.gbz \
-    --outdir test_results_pangenie \
+    --outdir test_results_deep_variants \
     -profile saga,singularity \
     -resume
 
