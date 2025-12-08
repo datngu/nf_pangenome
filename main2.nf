@@ -209,24 +209,20 @@ workflow {
         .splitCsv(header: true)
         .map { row -> tuple(row.sample, file(row.read1), file(row.read2)) }
 
-
-    // Load reference files
-    graph_ch = Channel.fromPath(params.hprc_graph)
-    genome_ch = Channel.fromPath(params.genome)
-
+    samples_ch.view { "Sample channel: ${it[0]}" }
 
     // Index HPRC graph for Giraffe alignment
-    INDEX_GRAPH(graph_ch)
+    INDEX_GRAPH(params.hprc_graph)
 
 
     // Align reads to pangenome graph with vg Giraffe
-    GIRAFFE_ALIGN(samples_ch, INDEX_GRAPH.out.indexes)
+    GIRAFFE_ALIGN(samples_ch, INDEX_GRAPH.out.indexes.collect())
 
 
     // Project GAM to BAM (hg38 coordinates)
-    PROJECT_BAM(GIRAFFE_ALIGN.out.gam, INDEX_GRAPH.out.gbz, genome_ch)
+    PROJECT_BAM(GIRAFFE_ALIGN.out.gam, INDEX_GRAPH.out.gbz.collect(), params.genome)
 
 
     // Call variants with Pangenome-Aware DeepVariant
-    CALL_SNPS_INDELS(PROJECT_BAM.out.bam, genome_ch, INDEX_GRAPH.out.gbz)
+    CALL_SNPS_INDELS(PROJECT_BAM.out.bam, params.genome, INDEX_GRAPH.out.gbz.collect())
 }

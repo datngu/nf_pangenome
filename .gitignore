@@ -7,7 +7,9 @@ legacy/
 results/
 output/
 
+
 # Test data
+samples.csv
 test_data/
 *.fastq
 *.fastq.gz
