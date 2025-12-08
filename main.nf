@@ -59,9 +59,21 @@ process NORMALIZE_VCF {
     
     script:
     """
-    bcftools norm -f ${genome} -Ov -o hprc_graph.normalized.vcf ${vcf}
+    # Create chromosome renaming map
+    bcftools view -h ${vcf} | grep "^##contig" | \\
+        sed 's/##contig=<ID=//; s/,.*//' | \\
+        grep "GRCh38#0#" | \\
+        awk '{print \$1 "\\t" \$1}' | \\
+        sed 's/GRCh38#0#//' > chr_rename.txt
+    
+    # Rename chromosomes in both header and variants
+    bcftools annotate --rename-chrs chr_rename.txt ${vcf} -Ov -o renamed.vcf
+
+    # Normalize the VCF  
+    bcftools norm -f ${genome} -Ov -o hprc_graph.normalized.vcf renamed.vcf
     """
 }
+
 
 
 process PANGENIE_INDEX {
