@@ -42,6 +42,27 @@ process EXTRACT_VCF_FROM_GRAPH {
 }
 
 
+process NORMALIZE_VCF {
+    tag "normalize_vcf"
+    container 'quay.io/biocontainers/bcftools:1.20--h8b25389_0'
+    memory '16 GB'
+    cpus 4
+
+    publishDir "${params.outdir}/graph_vcf", mode: 'copy'
+    
+    input:
+    path vcf
+    path genome
+
+    output:
+    path "hprc_graph.normalized.vcf", emit: normalized_vcf
+    
+    script:
+    """
+    bcftools norm -f ${genome} -Ov -o hprc_graph.normalized.vcf ${vcf}
+    """
+}
+
 
 process PANGENIE_INDEX {
     tag "PanGenie_index"
@@ -65,11 +86,13 @@ process PANGENIE_INDEX {
 }
 
 
+
 workflow {
     graph_ch = Channel.fromPath(params.hprc_graph)
     genome_ch = Channel.fromPath(params.genome)
 
     EXTRACT_VCF_FROM_GRAPH(graph_ch)
-    PANGENIE_INDEX(EXTRACT_VCF_FROM_GRAPH.out.vcf, genome_ch)
+    NORMALIZE_VCF(EXTRACT_VCF_FROM_GRAPH.out.vcf, genome_ch)
+    PANGENIE_INDEX(NORMALIZE_VCF.out.normalized_vcf, genome_ch)
 
 }
