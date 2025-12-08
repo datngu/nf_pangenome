@@ -41,7 +41,6 @@ process EXTRACT_VCF_FROM_GRAPH {
     """
 }
 
-
 process NORMALIZE_VCF {
     tag "normalize_vcf"
     container 'quay.io/biocontainers/bcftools:1.20--h8b25389_0'
@@ -63,16 +62,19 @@ process NORMALIZE_VCF {
     bcftools view -h ${vcf} | grep "^##contig" | \\
         sed 's/##contig=<ID=//; s/,.*//' | \\
         grep "GRCh38#0#" | \\
-        awk '{print \$1 "\\t" \$1}' | \\
-        sed 's/GRCh38#0#//' > chr_rename.txt
-    
-    # Rename chromosomes in both header and variants
+        awk '{old=\$1; new=\$1; sub(/^GRCh38#0#/,"",new); print old "\\t" new}' > chr_rename.txt
+
+    # Rename chromosomes
     bcftools annotate --rename-chrs chr_rename.txt ${vcf} -Ov -o renamed.vcf
 
-    # Normalize the VCF  
+    # Normalize
     bcftools norm -f ${genome} -Ov -o hprc_graph.normalized.vcf renamed.vcf
+    
+    # Cleanup
+    rm -f renamed.vcf
     """
 }
+
 
 
 
