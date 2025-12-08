@@ -184,6 +184,8 @@ process CALL_SNPS_INDELS {
     script:
     def model = params.read_type == 'long' ? 'PACBIO' : 'WGS'
     """
+    samtools faidx ${reference}
+
     /opt/deepvariant/bin/run_pangenome_aware_deepvariant \
         --model_type=${model} \
         --ref=${reference} \
