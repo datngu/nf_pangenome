@@ -11,7 +11,7 @@
     Pipeline: Short variant calling with pangenome reference
     
     Workflow:
-    1. INDEX_GRAPH       - Auto-index HPRC pangenome graph for Giraffe alignment
+    1. INDEX_GRAPH       - Build Giraffe indexes for HPRC pangenome graph
     2. GIRAFFE_ALIGN     - Align reads with vg Giraffe (state-of-the-art)
     3. PROJECT_BAM       - Project GAM to BAM format (hg38 coordinates)
     4. CALL_SNPS_INDELS  - Call variants with Pangenome-Aware DeepVariant
@@ -28,6 +28,7 @@
 */
 
 
+
 /*
  Define the default parameters
 */ 
@@ -39,22 +40,27 @@ params.read_type       = "short"  // "short" or "long"
 params.output_bam      = false
 
 
+
 nextflow.enable.dsl=2
 
 
+
 /*
- * INDEX_GRAPH: Build graph indexes for Giraffe alignment using vg autoindex
+ * INDEX_GRAPH: Build distance and minimizer indexes for Giraffe alignment
+ * FIXED: Removed vg autoindex --gbz-input (invalid flag)
  */
 process INDEX_GRAPH {
-    tag "autoindex_giraffe"
+    tag "build_giraffe_indexes"
     container 'docker://quay.io/vgteam/vg:v1.65.0'
     memory '128 GB'
     cpus 16
+
 
     publishDir "${params.outdir}/indexes", mode: 'copy'
     
     input:
     path graph
+
 
     output:
     path "index.gbz", emit: gbz
@@ -64,13 +70,17 @@ process INDEX_GRAPH {
     
     script:
     """
-    # Use vg autoindex with GBZ input for Giraffe workflow
-    vg autoindex --workflow giraffe \
-        --prefix index \
-        --gbz-input ${graph} \
-        --threads ${task.cpus}
+    # Copy input GBZ
+    cp ${graph} index.gbz
+    
+    # Build distance index
+    vg index -j index.dist index.gbz
+    
+    # Build minimizer index
+    vg minimizer -k 29 -w 11 -g index.gbz -d index.dist -o index.min
     """
 }
+
 
 
 /*
@@ -82,11 +92,13 @@ process GIRAFFE_ALIGN {
     memory '64 GB'
     cpus 16
 
+
     publishDir "${params.outdir}/alignments/${sample}", mode: 'copy', pattern: "*.gam"
     
     input:
     tuple val(sample), path(read1), path(read2)
     tuple path(gbz), path(dist), path(min)
+
 
     output:
     tuple val(sample), path("${sample}.gam"), emit: gam
@@ -105,6 +117,7 @@ process GIRAFFE_ALIGN {
 }
 
 
+
 /*
  * PROJECT_BAM: Project GAM alignment to linear reference and create BAM
  * Note: vg surject projects to GRCh38/hg38 reference paths embedded in the GBZ
@@ -115,12 +128,14 @@ process PROJECT_BAM {
     memory '64 GB'
     cpus 16
 
+
     publishDir "${params.outdir}/alignments/${sample}", mode: 'copy', enabled: params.output_bam
     
     input:
     tuple val(sample), path(gam)
     path gbz
     path reference
+
 
     output:
     tuple val(sample), path("${sample}.bam"), path("${sample}.bam.bai"), emit: bam
@@ -144,6 +159,7 @@ process PROJECT_BAM {
 }
 
 
+
 /*
  * CALL_SNPS_INDELS: Call SNPs and Indels with Pangenome-Aware DeepVariant
  */
@@ -153,12 +169,14 @@ process CALL_SNPS_INDELS {
     memory '64 GB'
     cpus 16
 
+
     publishDir "${params.outdir}/variants/${sample}", mode: 'copy'
     
     input:
     tuple val(sample), path(bam), path(bai)
     path reference
     path gbz
+
 
     output:
     tuple val(sample), path("${sample}.deepvariant.vcf.gz"), path("${sample}.deepvariant.vcf.gz.tbi"), emit: vcf
@@ -183,6 +201,7 @@ process CALL_SNPS_INDELS {
 
 
 
+
 workflow {
     // Read samples from CSV
     // CSV format: sample,read1,read2
@@ -191,18 +210,23 @@ workflow {
         .splitCsv(header: true)
         .map { row -> tuple(row.sample, file(row.read1), file(row.read2)) }
 
+
     // Load reference files
     graph_ch = Channel.fromPath(params.hprc_graph)
     genome_ch = Channel.fromPath(params.genome)
 
-    // Index HPRC graph for Giraffe alignment using vg autoindex
+
+    // Index HPRC graph for Giraffe alignment
     INDEX_GRAPH(graph_ch)
+
 
     // Align reads to pangenome graph with vg Giraffe
     GIRAFFE_ALIGN(samples_ch, INDEX_GRAPH.out.indexes)
 
+
     // Project GAM to BAM (hg38 coordinates)
     PROJECT_BAM(GIRAFFE_ALIGN.out.gam, INDEX_GRAPH.out.gbz, genome_ch)
+
 
     // Call variants with Pangenome-Aware DeepVariant
     CALL_SNPS_INDELS(PROJECT_BAM.out.bam, genome_ch, INDEX_GRAPH.out.gbz)
