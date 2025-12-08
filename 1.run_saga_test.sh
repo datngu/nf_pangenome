@@ -12,9 +12,13 @@ module load Nextflow/24.04.2
 
 
 ## set Singularity cache and tmp directories
+mkdir -p /cluster/projects/nn9114k/datngu/singularity/tmp
 
 export SINGULARITY_CACHEDIR="/cluster/projects/nn9114k/datngu/singularity"
 export SINGULARITY_TMPDIR="/cluster/projects/nn9114k/datngu/singularity/tmp"
+
+## set Nextflow Singularity cache directory
+export NXF_SINGULARITY_CACHEDIR="/cluster/projects/nn9114k/datngu/singularity"
 
 ## singularity build vg_v1.65.0.sif docker://quay.io/vgteam/vg:v1.65.0
 
