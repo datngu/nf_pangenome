@@ -2,7 +2,7 @@
 work/
 .nextflow/
 .nextflow.log*
-
+legacy/
 # Results
 results/
 output/
