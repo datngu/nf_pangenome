@@ -36,7 +36,7 @@ params.meta_csv        = "$baseDir/samples.csv"
 params.outdir          = "test_results"
 params.read_type       = "short"  // "short" or "long"
 params.output_bam      = false
-params.ref_prefix      = "GRCh38#0#"  // HPRC v1.1 path prefix
+params.ref_prefix      = "GRCh38"  // HPRC v1.1 path prefix
 
 nextflow.enable.dsl=2
 
