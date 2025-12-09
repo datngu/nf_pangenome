@@ -11,7 +11,7 @@
     Pipeline: Short variant calling with pangenome reference
     
     Workflow:
-    1. EXTRACT_REFERENCE    - Extract GRCh38 reference from HPRC graph (with HPRC notation)
+    1. EXTRACT_REFERENCE    - Extract ${params.ref_prefix} reference from HPRC graph (with HPRC notation)
     2. INDEX_GRAPH          - Build Giraffe indexes for HPRC pangenome graph
     3. GIRAFFE_ALIGN        - Align reads with vg Giraffe
     4. PROJECT_BAM          - Project GAM to BAM format (HPRC notation)
@@ -41,48 +41,39 @@ params.ref_prefix      = "GRCh38#0#"  // HPRC v1.1 path prefix
 nextflow.enable.dsl=2
 
 /*
- * EXTRACT_REFERENCE: Extract GRCh38 reference from pangenome graph
- * Keeps HPRC notation (GRCh38#0#chr1) for consistency with graph
+ * EXTRACT_REFERENCE: Extract {GENOME_REF} reference from pangenome graph
+ * Keeps HPRC notation (GENOME_REF#0#chr1) for consistency with graph
  */
+
 process EXTRACT_REFERENCE {
-    tag "extract_grch38"
+    tag "extract_${params.ref_prefix}"
     container 'docker://quay.io/vgteam/vg:v1.65.0'
     memory '32 GB'
     cpus 8
 
     publishDir "${params.outdir}/reference", mode: 'copy'
-    
+
     input:
     path gbz
 
     output:
-    path "GRCh38.fa", emit: fasta
-    path "GRCh38.fa.fai", emit: fai
+    path "genome_ref.fa", emit: fasta
+    path "genome_ref.fa.fai", emit: fai
     path "chrom_rename.txt", emit: rename_map
-    
+
     script:
     """
-    # Extract FASTA with HPRC path names (GRCh38#0#chr1, GRCh38#0#chr2, etc.)
-    vg paths -x ${gbz} -F -S GRCh38 > GRCh38.fa
-    
-    # Index the FASTA
-    samtools faidx GRCh38.fa
-    
-    # Create chromosome renaming map for VCF conversion later
-    # Format: old_name new_name (one per line)
-    cut -f1 GRCh38.fa.fai | awk -F'#' '{
-        if (\$3 ~ /^chr[0-9XY]+\$/) {
-            print \$0 "\\t" \$3
-        }
+    vg paths -x ${gbz} -F -S ${params.ref_prefix} > genome_ref.fa
+
+    samtools faidx genome_ref.fa
+
+    cut -f1 genome_ref.fa.fai | awk -F'#' '{
+        if (\$3 ~ /^chr[0-9XY]+\$/) print \$0 "\\t" \$3
     }' > chrom_rename.txt
-    
-    echo "Chromosome renaming map:"
-    head -5 chrom_rename.txt
-    
-    echo "Extracted chromosomes:"
-    cut -f1 GRCh38.fa.fai | head -10
+
     """
 }
+
 
 /*
  * INDEX_GRAPH: Build distance and minimizer indexes for Giraffe alignment
@@ -152,7 +143,7 @@ process GIRAFFE_ALIGN {
 
 /*
  * PROJECT_BAM: Project GAM to BAM with HPRC chromosome notation
- * BAM will have chromosomes named GRCh38#0#chr1, GRCh38#0#chr2, etc.
+ * BAM will have chromosomes named GENOME_REF#0#chr1, GENOME_REF#0#chr2, etc.
  */
 process PROJECT_BAM {
     tag "${sample}"
@@ -192,7 +183,7 @@ process PROJECT_BAM {
 
 /*
  * CALL_SNPS_INDELS: Call variants with Pangenome-Aware DeepVariant
- * VCF will have HPRC chromosome notation (GRCh38#0#chr1)
+ * VCF will have HPRC chromosome notation (GENOME_REF#0#chr1)
  */
 process CALL_SNPS_INDELS {
     tag "${sample}"
@@ -232,7 +223,7 @@ process CALL_SNPS_INDELS {
 
 /*
  * FIX_VCF_CHROMS: Convert chromosome names from HPRC to standard notation
- * GRCh38#0#chr1 -> chr1, GRCh38#0#chr2 -> chr2, etc.
+ * GENOME_REF#0#chr1 -> chr1, GENOME_REF#0#chr2 -> chr2, etc.
  */
 process FIX_VCF_CHROMS {
     tag "${sample}"
