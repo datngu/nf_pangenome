@@ -23,7 +23,7 @@ export NXF_SINGULARITY_CACHEDIR="/cluster/projects/nn9114k/datngu/singularity"
 ## singularity build quay.io-vgteam-vg-v1.65.0.img docker://quay.io/vgteam/vg:v1.65.0
 
 
-nextflow run main2.nf \
+nextflow run main_short_var.nf \
     --input_csv samples.csv \
     --reference test_data/GRCh38.fa \
     --graph test_data/hprc-v1.1-mc-grch38.gbz \
