@@ -145,41 +145,46 @@ process GIRAFFE_ALIGN {
  * PROJECT_BAM: Project GAM to BAM with HPRC chromosome notation
  * BAM will have chromosomes named GENOME_REF#0#chr1, GENOME_REF#0#chr2, etc.
  */
+
 process PROJECT_BAM {
     tag "${sample}"
     container 'docker://quay.io/vgteam/vg:v1.65.0'
-    memory '64 GB'
+    memory '128 GB'
     cpus 16
+
 
     publishDir "${params.outdir}/alignments/${sample}", mode: 'copy', enabled: params.output_bam
     
     input:
     tuple val(sample), path(gam)
     path gbz
-    path reference
-    path ref_fai
 
     output:
     tuple val(sample), path("${sample}.bam"), path("${sample}.bam.bai"), emit: bam
     
     script:
-    """
+    def samtools_threads = 3
+    def vg_threads = task.cpus - samtools_threads
 
+    """
     vg surject \
         -x ${gbz} \
-        -t ${task.cpus} \
+        -t ${vg_threads} \
+        -n ${params.ref_prefix} \
         --prune-low-cplx \
         --interleaved \
+        --max-frag-len 10000 \
         --sample ${sample} \
         --read-group "ID:${sample} SM:${sample} LB:lib1 PL:ILLUMINA PU:unit1" \
         --bam-output \
         ${gam} | \
-    samtools sort -@ ${task.cpus} -m 4G -o ${sample}.bam -
+    samtools sort -@ ${samtools_threads} -m 6G -o ${sample}.bam -
     
     samtools index -@ ${task.cpus} ${sample}.bam
     
     """
 }
+
 
 /*
  * CALL_SNPS_INDELS: Call variants with Pangenome-Aware DeepVariant
@@ -282,9 +287,7 @@ workflow {
     // Project GAM to BAM (HPRC notation)
     PROJECT_BAM(
         GIRAFFE_ALIGN.out.gam, 
-        INDEX_GRAPH.out.gbz.collect(),
-        EXTRACT_REFERENCE.out.fasta.collect(),
-        EXTRACT_REFERENCE.out.fai.collect()
+        INDEX_GRAPH.out.gbz.collect()
     )
 
     // Call variants with Pangenome-Aware DeepVariant (HPRC notation)
