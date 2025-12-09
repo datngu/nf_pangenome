@@ -30,9 +30,9 @@
 /*
  Define the default parameters
 */ 
-params.hprc_graph               = "$baseDir/test_data/hprc-v1.1-mc-grch38.gbz"
-params.hprc_pangenie_vcf_url    = "https://zenodo.org/records/6797328/files/cactus_filtered_ids.vcf.gz"
-params.hprc_pangenie_callset_url = "https://zenodo.org/record/6797328/files/cactus_filtered_ids_biallelic.vcf.gz"
+params.hprc_graph                = "$baseDir/test_data/hprc-v1.1-mc-grch38.gbz"
+params.hprc_pangenie_vcf         = "$baseDir/test_data/pangenie_hprc.vcf"
+params.hprc_pangenie_callset_vcf = "$baseDir/test_data/pangenie_hprc_callset.vcf"
 
 
 params.meta_csv                 = "$baseDir/samples.csv"
@@ -88,61 +88,6 @@ process EXTRACT_REFERENCE {
 
 
 /*
- * DOWNLOAD_HPRC_VCF: Download pre-processed HPRC VCF for PanGenie
- * NOTE: This VCF is already have standard chr{i} convention, filtered and formatted for PanGenie use
- */
-
-
-process DOWNLOAD_HPRC_VCF {
-    tag "download_hprc_vcf"
-    container 'docker://quay.io/biocontainers/bcftools:1.20--h8b25389_0'
-    memory '16 GB'
-    cpus 4
-
-
-    publishDir "${params.outdir}/vcf", mode: 'copy'
-    
-    output:
-    path "pangenie_hprc.vcf", emit: vcf
-    
-    script:
-    """
-
-
-    wget -O pangenie_hprc.vcf.gz ${params.hprc_pangenie_vcf_url}
-    
-    bcftools view pangenie_hprc.vcf.gz -Ov -o pangenie_hprc.vcf
-
-
-    """
-}
-
-
-
-process DOWNLOAD_HPRC_CALLSET_VCF {
-    tag "download_hprc_callset_vcf"
-    container 'docker://quay.io/biocontainers/bcftools:1.20--h8b25389_0'
-    memory '16 GB'
-    cpus 4
-
-
-    publishDir "${params.outdir}/vcf", mode: 'copy'
-    
-    output:
-    path "pangenie_hprc_callset.vcf.gz", emit: vcf
-    
-    script:
-    """
-
-
-    wget -O pangenie_hprc_callset.vcf.gz ${params.hprc_pangenie_callset_url}
-
-
-    """
-}
-
-
-/*
  * PANGENIE_INDEX: Build PanGenie index (preprocessing step)
  * This only needs to be done once for all samples
  */
@@ -175,6 +120,7 @@ process PANGENIE_INDEX {
         -t ${task.cpus}
     
     touch pangenie-index.done
+    
     """
 }
 
@@ -233,24 +179,16 @@ workflow {
         .map { row -> tuple(row.sample, file(row.read1), file(row.read2)) }
 
 
-    samples_ch.view { "Sample channel: ${it[0]}" }
+    //samples_ch.view { "Sample channel: ${it[0]}" }
 
 
     // Extract reference from HPRC graph
     EXTRACT_REFERENCE(params.hprc_graph)
 
 
-    // Download pre-processed HPRC VCF
-    DOWNLOAD_HPRC_VCF()
-
-
-    // Download HPRC callset VCF
-    DOWNLOAD_HPRC_CALLSET_VCF()
-
-
     // Build PanGenie index (once for all samples)
     PANGENIE_INDEX(
-        DOWNLOAD_HPRC_VCF.out.vcf,
+        params.hprc_pangenie_vcf,
         EXTRACT_REFERENCE.out.fasta,
         EXTRACT_REFERENCE.out.fai
     )

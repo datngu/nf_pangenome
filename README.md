@@ -18,18 +18,23 @@ Copy and paste these commands to download reference genome, HPRC graph, and NA12
 mkdir -p test_data
 cd test_data
 
-# 1. Download GRCh38 full reference genome
-echo "Downloading GRCh38 reference genome..."
-wget -O GRCh38.fa.gz \
-    "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz"
+# 1. Download pangenie_hprc.vcf (HPRC variants for PanGenie)
+echo "Downloading pangenie_hprc.vcf..."
+wget --progress=bar:force \
+    -O pangenie_hprc.vcf.gz \
+    "https://zenodo.org/record/6797328/files/cactus_filtered_ids.vcf.gz?download=1"
 
-gunzip GRCh38.fa.gz
+zcat pangenie_hprc.vcf.gz > pangenie_hprc.vcf
+echo "✓ pangenie_hprc.vcf downloaded"
 
-# Index reference (optional but recommended)
-module load SAMtools/1.17-GCC-12.2.0
-samtools faidx GRCh38.fa
+wget --progress=bar:force \
+    -O pangenie_hprc_callset.vcf.gz \
+    "https://zenodo.org/record/6797328/files/cactus_filtered_ids_biallelic.vcf.gz?download=1"
 
-echo "✓ GRCh38 reference genome ready"
+zcat pangenie_hprc_callset.vcf.gz > pangenie_hprc_callset.vcf
+
+echo "✓ pangenie_hprc_callset.vcf downloaded"
+
 
 # 2. Download HPRC v1.1 pangenome graph (~50GB - this takes time!)
 echo "Downloading HPRC v1.1 graph (~50GB)..."
