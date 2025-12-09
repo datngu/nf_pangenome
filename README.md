@@ -188,29 +188,36 @@ nextflow run main_short_var.nf \
 | `--outdir` | `test_results` | Output directory |
 | `--read_type` | `short` | Read type: `short` or `long` |
 | `--output_bam` | `false` | Keep BAM files (set `true` to retain) |
-| `--ref_prefix` | `GRCh38#0#` | HPRC reference path prefix |
+| `--ref_prefix` | `GRCh38` | HPRC reference path prefix (without #0#) |
 
 ### Output Structure
 
 ```
 results_short_variants/
-├── reference/              # Extracted GRCh38 reference
+├── reference/              # Extracted reference from graph
 │   ├── genome_ref.fa
-│   └── genome_ref.fa.fai
+│   ├── genome_ref.fa.fai
+│   └── chrom_rename.txt
 ├── indexes/                # Graph indexes (reusable)
-│   ├── graph.gbz
-│   ├── graph.dist
-│   └── graph.min
-├── alignments/             # Optional BAM files
+│   ├── index.gbz
+│   ├── index.dist
+│   ├── index.min
+│   └── index.zipcodes
+├── alignments/             # GAM files and optional BAMs
 │   └── {sample}/
-│       ├── {sample}.bam
-│       └── {sample}.bam.bai
-└── variants/               # Final VCF files
+│       ├── {sample}.gam
+│       ├── {sample}.bam         # Only if --output_bam true
+│       └── {sample}.bam.bai     # Only if --output_bam true
+└── variants/               # VCF files (standard chromosome names)
     └── {sample}/
-        ├── {sample}.vcf.gz
-        ├── {sample}.vcf.gz.tbi
-        ├── {sample}.g.vcf.gz
-        └── {sample}.g.vcf.gz.tbi
+        ├── {sample}.hprc.vcf.gz        # Intermediate (HPRC notation)
+        ├── {sample}.hprc.vcf.gz.tbi
+        ├── {sample}.deepvariant.vcf.gz # Final (chr1, chr2, etc.)
+        ├── {sample}.deepvariant.vcf.gz.tbi
+        ├── {sample}.hprc.g.vcf.gz
+        ├── {sample}.hprc.g.vcf.gz.tbi
+        ├── {sample}.deepvariant.g.vcf.gz
+        └── {sample}.deepvariant.g.vcf.gz.tbi
 ```
 
 ---
@@ -326,16 +333,16 @@ sample2,/path/to/sample2_R1.fq.gz,/path/to/sample2_R2.fq.gz
 
 All tools are containerized for reproducibility and run via Singularity on HPC systems.
 
-### Short Variant Pipeline (`main2.nf`)
+### Short Variant Pipeline (`main_short_var.nf`)
 
 | Process | Container | Tool | Version |
 |---------|-----------|------|---------|
-| EXTRACT_REFERENCE | `quay.io/vgteam/vg:v1.65.0` | vg paths | v1.65.0 |
-| INDEX_GRAPH | `quay.io/vgteam/vg:v1.65.0` | vg autoindex | v1.65.0 |
+| EXTRACT_REFERENCE | `quay.io/vgteam/vg:v1.65.0` | vg paths + samtools | v1.65.0 |
+| INDEX_GRAPH | `quay.io/vgteam/vg:v1.65.0` | vg index + vg minimizer | v1.65.0 |
 | GIRAFFE_ALIGN | `quay.io/vgteam/vg:v1.65.0` | vg giraffe | v1.65.0 |
 | PROJECT_BAM | `quay.io/vgteam/vg:v1.65.0` | vg surject + samtools | v1.65.0 |
-| CALL_SNPS_INDELS | `google/deepvariant:pangenome_aware_deepvariant-head737001992` | Pangenome-Aware DeepVariant | head737001992 |
-| FIX_VCF_CHROMS | `biocontainers/bcftools:v1.18_cv1` | bcftools annotate | v1.18 |
+| CALL_SNPS_INDELS | `google/deepvariant:pangenome_aware_deepvariant-1.8.0` | Pangenome-Aware DeepVariant | 1.8.0 |
+| FIX_VCF_CHROMS | `biocontainers/bcftools:1.20--h8b25389_0` | bcftools annotate | 1.20 |
 
 ### SV Pipeline (`main_sv.nf`)
 
@@ -349,7 +356,7 @@ All tools are containerized for reproducibility and run via Singularity on HPC s
 
 ## Resource Requirements
 
-### Short Variant Pipeline (`main2.nf`)
+### Short Variant Pipeline (`main_short_var.nf`)
 
 | Process | Memory | CPUs | Time (est.) |
 |---------|--------|------|-------------|
@@ -396,7 +403,7 @@ rm -rf $HOME/.singularity/cache
 grep "profiles {" -A 30 nextflow.config
 
 # Always combine executor + singularity profiles
-nextflow run main2.nf -profile saga,singularity ...
+nextflow run main_short_var.nf -profile saga,singularity ...
 ```
 
 **5. Container permission errors**
