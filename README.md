@@ -1,6 +1,17 @@
-## Quick Start - Test Pipeline
+# nf-pangenome
 
-Follow these steps to download test data and run the pipeline on SAGA:
+Nextflow pipelines for pangenome-based variant calling using the HPRC pangenome graph.
+
+## Overview
+
+This repository contains **two Nextflow pipelines** for state-of-the-art pangenome-based variant calling:
+
+1. **`main_short_var.nf`** - Short variant calling (SNPs/indels) with vg Giraffe + Pangenome-Aware DeepVariant
+2. **`main_sv.nf`** - Structural variant genotyping with PanGenie
+
+Both pipelines use the [HPRC v1.1 pangenome graph](https://github.com/human-pangenomics/hpp_pangenome_resources) (GRCh38-based) for improved variant detection in diverse populations.
+
+## Quick Start
 
 ### Step 1: Clone Repository
 
@@ -35,9 +46,8 @@ zcat pangenie_hprc_callset.vcf.gz > pangenie_hprc_callset.vcf
 
 echo "✓ pangenie_hprc_callset.vcf downloaded"
 
-
-# 2. Download HPRC v1.1 pangenome graph (~50GB - this takes time!)
-echo "Downloading HPRC v1.1 graph (~50GB)..."
+# 2. Download HPRC v1.1 pangenome graph
+echo "Downloading HPRC v1.1 graph..."
 wget --progress=bar:force \
     -O hprc-v1.1-mc-grch38.gbz \
     "https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38/hprc-v1.1-mc-grch38.gbz"
@@ -88,6 +98,371 @@ EOF
 echo "✓ samples.csv created with absolute paths"
 cat samples.csv
 
-
 echo "✓ Setup complete! Ready to submit job."
 ```
+
+### Step 4: Configure Nextflow for Your HPC
+
+Edit `nextflow.config` to add your cluster configuration. The file includes templates for SAGA, Orion, and a generic HPC setup.
+
+**Example for adding your HPC:**
+
+```groovy
+profiles {
+  saga {
+    executor.name          = 'slurm'
+    executor.account       = 'nn9114k'
+    process.clusterOptions = '--time=72:00:00'  
+  }
+
+  orion {
+    executor.name          = 'slurm'
+    process.clusterOptions = '--time=72:00:00'  
+  }
+  
+  // ADD your hpc setup below
+  my_cluster {
+    executor.name          = 'slurm'
+    executor.account       = 'my_account_name'
+    process.clusterOptions = '--time=72:00:00 --partition=normal'
+    // executor.perCpuMemAllocation = true   
+    // Uncomment if your Slurm requires --mem-per-cpu instead of --mem
+  }
+
+  singularity {
+    singularity.enabled     = true
+    singularity.autoMounts  = true
+    singularity.pullTimeout = '5h'
+
+    conda.enabled           = false
+    docker.enabled          = false
+  }
+}
+```
+
+**Key configuration options:**
+- `executor.name`: Job scheduler type (`slurm`, `pbs`, `sge`, etc.)
+- `executor.account`: Your HPC project/account name
+- `process.clusterOptions`: Additional scheduler flags (time limits, partitions, QoS, etc.)
+- `executor.perCpuMemAllocation`: Uncomment if your cluster uses `--mem-per-cpu`
+
+---
+
+## Pipeline 1: Short Variant Calling (`main_short_var.nf`)
+
+Call SNPs and indels using vg Giraffe alignment and Pangenome-Aware DeepVariant.
+
+### Workflow
+
+```
+HPRC Graph (GBZ) → Extract Reference → Index Graph
+                                            ↓
+Sample Reads → Giraffe Align → Project BAM → DeepVariant → VCF (SNPs/indels)
+```
+
+### Run the Pipeline
+
+```bash
+# Using SAGA profile with Singularity
+nextflow run main_short_var.nf \
+    -profile saga,singularity \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --meta_csv samples.csv \
+    --outdir results_short_variants \
+    --output_bam true
+
+# Using your custom profile
+nextflow run main_short_var.nf \
+    -profile my_cluster,singularity \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --meta_csv samples.csv \
+    --outdir results_short_variants
+```
+
+### Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--hprc_graph` | `test_data/hprc-v1.1-mc-grch38.gbz` | HPRC pangenome graph (GBZ format) |
+| `--meta_csv` | `samples.csv` | Sample sheet (sample,read1,read2) |
+| `--outdir` | `test_results` | Output directory |
+| `--read_type` | `short` | Read type: `short` or `long` |
+| `--output_bam` | `false` | Keep BAM files (set `true` to retain) |
+| `--ref_prefix` | `GRCh38#0#` | HPRC reference path prefix |
+
+### Output Structure
+
+```
+results_short_variants/
+├── reference/              # Extracted GRCh38 reference
+│   ├── genome_ref.fa
+│   └── genome_ref.fa.fai
+├── indexes/                # Graph indexes (reusable)
+│   ├── graph.gbz
+│   ├── graph.dist
+│   └── graph.min
+├── alignments/             # Optional BAM files
+│   └── {sample}/
+│       ├── {sample}.bam
+│       └── {sample}.bam.bai
+└── variants/               # Final VCF files
+    └── {sample}/
+        ├── {sample}.vcf.gz
+        ├── {sample}.vcf.gz.tbi
+        ├── {sample}.g.vcf.gz
+        └── {sample}.g.vcf.gz.tbi
+```
+
+---
+
+## Pipeline 2: SV Genotyping (`main_sv.nf`)
+
+Genotype structural variants using PanGenie with HPRC SV catalog.
+
+### Workflow
+
+```
+HPRC Graph (GBZ) → Extract Reference
+                        ↓
+HPRC VCF → PanGenie Index (once)
+                ↓
+Sample Reads → PanGenie Genotype → VCF (SVs)
+```
+
+### Run the Pipeline
+
+```bash
+# Using SAGA profile with Singularity
+nextflow run main_sv.nf \
+    -profile saga,singularity \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --hprc_pangenie_vcf test_data/pangenie_hprc.vcf \
+    --meta_csv samples.csv \
+    --outdir results_svs
+
+# Using your custom profile
+nextflow run main_sv.nf \
+    -profile my_cluster,singularity \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --hprc_pangenie_vcf test_data/pangenie_hprc.vcf \
+    --meta_csv samples.csv \
+    --outdir results_svs
+```
+
+### Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--hprc_graph` | `test_data/hprc-v1.1-mc-grch38.gbz` | HPRC pangenome graph |
+| `--hprc_pangenie_vcf` | `test_data/pangenie_hprc.vcf` | HPRC SV catalog for PanGenie |
+| `--hprc_pangenie_callset_vcf` | `test_data/pangenie_hprc_callset.vcf` | Biallelic HPRC SV catalog |
+| `--meta_csv` | `samples.csv` | Sample sheet (sample,read1,read2) |
+| `--outdir` | `test_results` | Output directory |
+| `--ref_prefix` | `GRCh38` | Reference prefix for extraction |
+
+### Output Structure
+
+```
+results_svs/
+├── reference/              # Extracted reference
+│   ├── genome_ref.fa
+│   ├── genome_ref.fa.fai
+│   └── chrom_rename.txt
+├── pangenie_index/         # PanGenie index (reusable)
+│   ├── pangenie-index-*
+│   └── pangenie-index.done
+└── genotypes/              # SV genotype VCFs
+    ├── {sample}_genotyping.vcf.gz
+    └── {sample}_genotyping.vcf.gz.tbi
+```
+
+---
+
+## Profile Usage
+
+Nextflow profiles control where and how your pipeline runs. You can combine multiple profiles:
+
+### Common Profile Combinations
+
+```bash
+# SAGA HPC with Singularity containers
+nextflow run main_short_var.nf -profile saga,singularity ...
+
+# Your custom HPC with Singularity
+nextflow run main_sv.nf -profile my_cluster,singularity ...
+
+# Orion HPC with Singularity
+nextflow run main_short_var.nf -profile orion,singularity ...
+
+```
+
+### Profile Types
+
+1. **Executor profiles** (`saga`, `orion`, `my_cluster`): Define HPC-specific settings
+2. **Container profiles** (`singularity`): Enable container technology
+
+**Always use both** an executor profile and the `singularity` profile for HPC runs.
+
+---
+
+## Sample CSV Format
+
+Both pipelines require a CSV file with three columns:
+
+```csv
+sample,read1,read2
+sample1,/path/to/sample1_R1.fq.gz,/path/to/sample1_R2.fq.gz
+sample2,/path/to/sample2_R1.fq.gz,/path/to/sample2_R2.fq.gz
+```
+
+**Requirements:**
+- Use **absolute paths** for read files
+- Gzipped FASTQ files (`.fq.gz` or `.fastq.gz`)
+- Paired-end reads required
+
+---
+
+## Tools and Containers
+
+All tools are containerized for reproducibility and run via Singularity on HPC systems.
+
+### Short Variant Pipeline (`main2.nf`)
+
+| Process | Container | Tool | Version |
+|---------|-----------|------|---------|
+| EXTRACT_REFERENCE | `quay.io/vgteam/vg:v1.65.0` | vg paths | v1.65.0 |
+| INDEX_GRAPH | `quay.io/vgteam/vg:v1.65.0` | vg autoindex | v1.65.0 |
+| GIRAFFE_ALIGN | `quay.io/vgteam/vg:v1.65.0` | vg giraffe | v1.65.0 |
+| PROJECT_BAM | `quay.io/vgteam/vg:v1.65.0` | vg surject + samtools | v1.65.0 |
+| CALL_SNPS_INDELS | `google/deepvariant:pangenome_aware_deepvariant-head737001992` | Pangenome-Aware DeepVariant | head737001992 |
+| FIX_VCF_CHROMS | `biocontainers/bcftools:v1.18_cv1` | bcftools annotate | v1.18 |
+
+### SV Pipeline (`main_sv.nf`)
+
+| Process | Container | Tool | Version |
+|---------|-----------|------|---------|
+| EXTRACT_REFERENCE | `quay.io/vgteam/vg:v1.65.0` | vg paths + samtools | v1.65.0 |
+| PANGENIE_INDEX | `mgibio/pangenie:v4.2.1-bookworm` | PanGenie-index | v4.2.1 |
+| PANGENIE_GENOTYPE | `mgibio/pangenie:v4.2.1-bookworm` | PanGenie | v4.2.1 |
+
+---
+
+## Resource Requirements
+
+### Short Variant Pipeline (`main2.nf`)
+
+| Process | Memory | CPUs | Time (est.) |
+|---------|--------|------|-------------|
+| EXTRACT_REFERENCE | 32 GB | 8 | ~30 min |
+| INDEX_GRAPH | 128 GB | 16 | ~2-4 hours |
+| GIRAFFE_ALIGN | 64 GB | 16 | ~4-8 hours per sample |
+| PROJECT_BAM | 64 GB | 16 | ~2-4 hours per sample |
+| CALL_SNPS_INDELS | 64 GB | 16 | ~8-12 hours per sample |
+| FIX_VCF_CHROMS | 16 GB | 4 | ~30 min per sample |
+
+### SV Pipeline (`main_sv.nf`)
+
+| Process | Memory | CPUs | Time (est.) |
+|---------|--------|------|-------------|
+| EXTRACT_REFERENCE | 32 GB | 8 | ~30 min |
+| PANGENIE_INDEX | 128 GB | 16 | ~2-4 hours |
+| PANGENIE_GENOTYPE | 64 GB | 16 | ~4-8 hours per sample |
+
+**Note:** Times are estimates for 30x WGS data. Actual times vary based on coverage and cluster load.
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**1. Singularity cache errors**
+```bash
+# Clear Singularity cache if containers fail to pull
+rm -rf $HOME/.singularity/cache
+```
+
+**2. Out of memory errors**
+- Increase memory in `nextflow.config` or process directives
+- Check cluster memory limits
+
+**3. Path not found errors**
+- Ensure absolute paths in `samples.csv`
+- Verify data files exist before running
+
+**4. Profile not found**
+```bash
+# List available profiles
+grep "profiles {" -A 30 nextflow.config
+
+# Always combine executor + singularity profiles
+nextflow run main2.nf -profile saga,singularity ...
+```
+
+**5. Container permission errors**
+- Ensure `singularity.autoMounts = true` in config
+- Check file permissions on input data
+
+---
+
+## Citations
+
+If you use these pipelines, please cite:
+
+### Pangenome Graph and HPRC
+
+**HPRC Pangenome:**
+- Liao WW, Asri M, Ebler J, et al. A draft human pangenome reference. *Nature*. 2023;617(7960):312-324. doi:[10.1038/s41586-023-05896-x](https://doi.org/10.1038/s41586-023-05896-x)
+
+### Short Variant Calling Tools
+
+**vg Giraffe (Graph Alignment):**
+- Monlong J, Ebler J, Eizenga JM, et al. Pangenome graph construction from genome sequences with structural variants. *bioRxiv*. 2025. doi:[10.1101/2025.09.29.678807](https://doi.org/10.1101/2025.09.29.678807)
+
+**Pangenome-Aware DeepVariant:**
+⚠️ **This is NOT standard DeepVariant** - it's specifically trained for pangenome graphs:
+- Chang PC, Bazak BR, Nattestad M, Coddington R, Eizenga JM, Carroll A, Paten B. Pangenome-Aware DeepVariant: Accurate SNP and Indel Calling on Whole Genome Sequences Aligned to Pangenome Reference Graphs. *medRxiv*. 2025. URL: [pubmed.ncbi.nlm.nih.gov/40501862](https://pubmed.ncbi.nlm.nih.gov/40501862)
+
+### SV Genotyping Tools
+
+**PanGenie:**
+- Ebler J, Ebert P, Clarke WE, et al. Pangenome-based genome inference allows efficient and accurate genotyping across a wide spectrum of variant classes. *Nature Genetics*. 2022;54(4):518-525. doi:[10.1038/s41588-022-01043-w](https://doi.org/10.1038/s41588-022-01043-w)
+
+**HPRC SV Catalog (used by PanGenie):**
+- Ebert P, Audano PA, Zhu Q, et al. Haplotype-resolved diverse human genomes and integrated analysis of structural variation. *Science*. 2021;372(6537):eabf7117. doi:[10.1126/science.abf7117](https://doi.org/10.1126/science.abf7117)
+
+### Nextflow
+
+- Di Tommaso P, Chatzou M, Floden EW, Barja PP, Palumbo E, Notredame C. Nextflow enables reproducible computational workflows. *Nature Biotechnology*. 2017;35(4):316-319. doi:[10.1038/nbt.3820](https://doi.org/10.1038/nbt.3820)
+
+---
+
+## License
+
+This pipeline is released under the MIT License.
+
+---
+
+## Author
+
+**Dat T. Nguyen**  
+Contact: ndat@utexas.edu  
+GitHub: [datngu](https://github.com/datngu)
+
+---
+
+## Acknowledgments
+
+- [Human Pangenome Reference Consortium (HPRC)](https://humanpangenome.org/)
+- [vg toolkit team](https://github.com/vgteam/vg)
+- [PanGenie developers](https://github.com/eblerjana/pangenie)
+- [Google DeepVariant team](https://github.com/google/deepvariant)
+
+---
+
+## Additional Resources
+
+- **HPRC Resources**: https://github.com/human-pangenomics/hpp_pangenome_resources
+- **vg Documentation**: https://github.com/vgteam/vg/wiki
+- **PanGenie Documentation**: https://github.com/eblerjana/pangenie
+- **Nextflow Documentation**: https://www.nextflow.io/docs/latest/
