@@ -48,44 +48,35 @@ nextflow.enable.dsl=2
  * REMOVE HPRC notation for standardization (chr1, chr2, etc.)
  */
 
-
 process EXTRACT_REFERENCE {
     tag "extract_${params.ref_prefix}"
     container 'docker://quay.io/vgteam/vg:v1.65.0'
     memory '32 GB'
     cpus 8
 
-
     publishDir "${params.outdir}/reference", mode: 'copy'
-
 
     input:
     path gbz
-
 
     output:
     path "genome_ref.fa", emit: fasta
     path "genome_ref.fa.fai", emit: fai
     path "chrom_rename.txt", emit: rename_map
 
-
     script:
     """
     # Extract FASTA from the graph
     vg paths -x ${gbz} -F -S ${params.ref_prefix} > genome_ref.fa
 
-
     # Index the FASTA
     samtools faidx genome_ref.fa
-
 
     # Create chromosome renaming map: old_name -> standard_name
     cut -f1 genome_ref.fa.fai | awk -F'#' '{if (\$3 ~ /^chr[0-9XY]+\$/) print \$0 "\\t" \$3}' > chrom_rename.txt
 
-
     # Get HPRC prefix from first line
-    PREFIX=\$(cut -f1 chrom_rename.txt | head -1 | sed 's/chr[0-9XY]*$//')
-
+    PREFIX=\$(cut -f1 chrom_rename.txt | head -1 | sed 's/chr[0-9XY]*\$//')
 
     # Remove prefix from FASTA and FAI
     sed -i "s/^>\${PREFIX}/>/" genome_ref.fa
