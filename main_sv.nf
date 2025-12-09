@@ -107,8 +107,7 @@ process PANGENIE_INDEX {
 
 
     output:
-    path "pangenie-index-*", emit: index_files
-    path "pangenie-index.done", emit: done
+    path "pangenie_index*", emit: index_files
     
     script:
     """
@@ -116,11 +115,10 @@ process PANGENIE_INDEX {
     PanGenie-index \
         -v ${vcf} \
         -r ${reference} \
-        -o pangenie-index \
+        -o pangenie_index \
         -t ${task.cpus}
     
-    touch pangenie-index.done
-    
+
     """
 }
 
@@ -140,7 +138,6 @@ process PANGENIE_GENOTYPE {
     input:
     tuple val(sample), path(read1), path(read2)
     path index_files
-    path index_done
 
 
     output:
@@ -155,7 +152,7 @@ process PANGENIE_GENOTYPE {
 
     PanGenie \
         -i reads.fq \
-        -f pangenie-index \
+        -f pangenie_index \
         -o ${sample} \
         -j 8 \
         -t 8 \
@@ -197,7 +194,6 @@ workflow {
     // Genotype each sample
     PANGENIE_GENOTYPE(
         samples_ch,
-        PANGENIE_INDEX.out.index_files.collect(),
-        PANGENIE_INDEX.out.done.collect()
+        PANGENIE_INDEX.out.index_files.collect()
     )
 }
