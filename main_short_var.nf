@@ -220,8 +220,8 @@ process CALL_SNPS_INDELS {
         --output_gvcf=${sample}.hprc.g.vcf.gz \
         --num_shards=${task.cpus}
     
-    tabix -p vcf ${sample}.hprc.vcf.gz
-    tabix -p vcf ${sample}.hprc.g.vcf.gz
+    tabix -f -p vcf ${sample}.hprc.vcf.gz
+    tabix -f -p vcf ${sample}.hprc.g.vcf.gz
     
     """
 }
@@ -299,9 +299,9 @@ workflow {
     )
 
     // Fix VCF chromosome names to standard notation
-    FIX_VCF_CHROMS(
-        CALL_SNPS_INDELS.out.vcf,
-        CALL_SNPS_INDELS.out.gvcf,
-        EXTRACT_REFERENCE.out.rename_map.collect()
-    )
+    // FIX_VCF_CHROMS(
+    //     CALL_SNPS_INDELS.out.vcf,
+    //     CALL_SNPS_INDELS.out.gvcf,
+    //     EXTRACT_REFERENCE.out.rename_map.collect()
+    // )
 }
