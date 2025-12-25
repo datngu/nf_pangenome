@@ -298,10 +298,10 @@ workflow {
         INDEX_GRAPH.out.gbz.collect()
     )
 
-    // Fix VCF chromosome names to standard notation
-    // FIX_VCF_CHROMS(
-    //     CALL_SNPS_INDELS.out.vcf,
-    //     CALL_SNPS_INDELS.out.gvcf,
-    //     EXTRACT_REFERENCE.out.rename_map.collect()
-    // )
+    Fix VCF chromosome names to standard notation
+    FIX_VCF_CHROMS(
+        CALL_SNPS_INDELS.out.vcf,
+        CALL_SNPS_INDELS.out.gvcf,
+        EXTRACT_REFERENCE.out.rename_map.collect()
+    )
 }
