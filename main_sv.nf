@@ -177,7 +177,7 @@ process PANGENIE_GENOTYPE {
 process CONVERT_TO_BIALLELIC {
     tag "${sample}"
     container 'docker://ndatth/ubuntu:22.04'
-    memory '16 GB'
+    memory '32 GB'
     cpus 1
 
     publishDir "${params.outdir}/biallelic_genotypes/", mode: 'copy'
