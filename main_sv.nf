@@ -11,15 +11,16 @@
     Pipeline: SV genotyping with PanGenie using HPRC pangenome
     
     Workflow:
-    1. EXTRACT_REFERENCE    - Extract GENOME_REF reference from HPRC graph
-    2. DOWNLOAD_HPRC_VCF    - Download pre-processed HPRC VCF for PanGenie
-    3. FIX_VCF_CHROMS       - Convert VCF chromosome names to standard notation
-    4. PANGENIE_INDEX       - Build PanGenie index from VCF and reference
-    5. PANGENIE_GENOTYPE    - Genotype SVs with PanGenie
+    1. EXTRACT_REFERENCE      - Extract GENOME_REF reference from HPRC graph
+    2. PANGENIE_INDEX         - Build PanGenie index from VCF and reference
+    3. PANGENIE_GENOTYPE      - Genotype SVs with PanGenie
+    4. CONVERT_TO_BIALLELIC   - Convert multiallelic genotypes to biallelic format
     
     Input:
     - HPRC pangenome graph (GBZ format) - for reference extraction
-    - Sample metadata CSV (sample,reads) - reads can be FASTA/FASTQ
+    - HPRC multiallelic VCF - for variant catalog
+    - HPRC biallelic callset VCF - for REF/ALT allele definitions (post-processing)
+    - Sample metadata CSV (sample,read1,read2) - reads can be FASTA/FASTQ
     
     Output:
     - Genotyped VCF files per sample with SV calls
@@ -83,7 +84,6 @@ process EXTRACT_REFERENCE {
     sed -i "s/^\${PREFIX}//" genome_ref.fa.fai
     """
 }
-
 
 
 
@@ -167,6 +167,42 @@ process PANGENIE_GENOTYPE {
 }
 
 
+
+
+/*
+ * CONVERT_TO_BIALLELIC: Convert multiallelic genotypes to biallelic format
+ * Post-processing step for PanGenie output
+ * Uses the biallelic callset VCF as reference for REF/ALT alleles
+ */
+process CONVERT_TO_BIALLELIC {
+    tag "${sample}"
+    container 'docker://python:3.9-slim'
+    memory '16 GB'
+    cpus 4
+
+    publishDir "${params.outdir}/genotypes_biallelic/", mode: 'copy'
+    
+    input:
+    tuple val(sample), path(genotype_vcf), path(genotype_tbi)
+    path biallelic_vcf
+
+    output:
+    tuple val(sample), path("${sample}_genotyping_biallelic.vcf.gz"), path("${sample}_genotyping_biallelic.vcf.gz.tbi"), emit: vcf_gz
+    
+    script:
+    """
+    # Convert to biallelic format
+    zcat ${genotype_vcf} | \
+        python ${projectDir}/bin/convert-to-biallelic.py ${biallelic_vcf} | \
+        bgzip -c > ${sample}_genotyping_biallelic.vcf.gz
+    
+    # Index the output VCF
+    tabix -p vcf ${sample}_genotyping_biallelic.vcf.gz
+    """
+}
+
+
+
 workflow {
     // Read samples from CSV
     // CSV format: sample,read1,read2
@@ -182,7 +218,6 @@ workflow {
     // Extract reference from HPRC graph
     EXTRACT_REFERENCE(params.hprc_graph)
 
-
     // Build PanGenie index (once for all samples)
     PANGENIE_INDEX(
         params.hprc_pangenie_vcf,
@@ -190,10 +225,15 @@ workflow {
         EXTRACT_REFERENCE.out.fai
     )
 
-
     // Genotype each sample
     PANGENIE_GENOTYPE(
         samples_ch,
         PANGENIE_INDEX.out.index_files.collect()
+    )
+
+    // Convert genotypes to biallelic format (post-processing)
+    CONVERT_TO_BIALLELIC(
+        PANGENIE_GENOTYPE.out.vcf_gz,
+        params.hprc_pangenie_callset_vcf
     )
 }
