@@ -574,31 +574,31 @@ If you use these pipelines, please cite:
 ### Pangenome Graph and HPRC
 
 **HPRC Pangenome:**
-- Liao WW, Asri M, Ebler J, et al. A draft human pangenome reference. *Nature*. 2023;617(7960):312-324. doi:[10.1038/s41586-023-05896-x](https://doi.org/10.1038/s41586-023-05896-x)
+
+- *Nature* doi:[10.1038/s41586-023-05896-x](https://doi.org/10.1038/s41586-023-05896-x)
 
 ### Short Variant Calling Tools
 
 **vg Giraffe (Graph Alignment):**
-- Monlong J, Ebler J, Eizenga JM, et al. Pangenome graph construction from genome sequences with structural variants. *bioRxiv*. 2025. doi:[10.1101/2025.09.29.678807](https://doi.org/10.1101/2025.09.29.678807)
+
+- *bioRxiv* doi:[10.1101/2025.09.29.678807](https://doi.org/10.1101/2025.09.29.678807)
 
 **Pangenome-Aware DeepVariant:**
 ⚠️ **This is NOT standard DeepVariant** - it's specifically trained for pangenome graphs:
-- Asri M, Chang PC, Mier JC, Sirén J, Eskandar P, Kolesnikov A, Cook DE, Bzikadze AV, Nattestad M, Baid G, Eizenga JM, Novak AM, Lorig-Roach R, Hickey G, Carroll A, Paten B. Pangenome-aware DeepVariant. *bioRxiv*. 2025. doi:[10.1101/2025.06.05.657102](https://doi.org/10.1101/2025.06.05.657102) PMID: [40501862](https://pubmed.ncbi.nlm.nih.gov/40501862)
+- *bioRxiv* doi:[10.1101/2025.06.05.657102](https://doi.org/10.1101/2025.06.05.657102)
 
 ### SV Genotyping Tools
 
 **PanGenie:**
-- Ebler J, Ebert P, Clarke WE, et al. Pangenome-based genome inference allows efficient and accurate genotyping across a wide spectrum of variant classes. *Nature Genetics*. 2022;54(4):518-525. doi:[10.1038/s41588-022-01043-w](https://doi.org/10.1038/s41588-022-01043-w)
+- *Nature Genetics*. doi:[10.1038/s41588-022-01043-w](https://doi.org/10.1038/s41588-022-01043-w)
 
-**HPRC SV Catalog (used by PanGenie):**
-- Ebert P, Audano PA, Zhu Q, et al. Haplotype-resolved diverse human genomes and integrated analysis of structural variation. *Science*. 2021;372(6537):eabf7117. doi:[10.1126/science.abf7117](https://doi.org/10.1126/science.abf7117)
 
 **1000 Genomes Project ONT SVs (available in `data/` directory):**
-- Ebert P, Audano PA, Zhu Q, et al. Haplotype-resolved diverse human genomes and integrated analysis of structural variation. *Nature*. 2025;637:696-706. doi:[10.1038/s41586-025-09290-7](https://doi.org/10.1038/s41586-025-09290-7)
+- *Nature* doi:[10.1038/s41586-025-09290-7](https://doi.org/10.1038/s41586-025-09290-7)
 
 ### Nextflow
 
-- Di Tommaso P, Chatzou M, Floden EW, Barja PP, Palumbo E, Notredame C. Nextflow enables reproducible computational workflows. *Nature Biotechnology*. 2017;35(4):316-319. doi:[10.1038/nbt.3820](https://doi.org/10.1038/nbt.3820)
+- *Nature Biotechnology* doi:[10.1038/nbt.3820](https://doi.org/10.1038/nbt.3820)
 
 ---
 
