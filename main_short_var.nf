@@ -196,7 +196,7 @@ process CALL_SNPS_INDELS {
     memory '64 GB'
     cpus 16
 
-    publishDir "${params.outdir}/variants/${sample}", mode: 'copy', pattern: "*hprc.{vcf.gz,vcf.gz.tbi}"
+    publishDir "${params.outdir}/variants/${sample}", mode: 'copy', pattern: "*hprc*.{vcf.gz,vcf.gz.tbi}"
     
     input:
     tuple val(sample), path(bam), path(bai)
