@@ -9,7 +9,7 @@ Nextflow pipelines for pangenome-based variant calling using the HPRC v1.1 pange
 
 ## Overview
 
-This repository contains **two production-ready Nextflow pipelines** for state-of-the-art pangenome-based variant calling:
+This repository contains **two Nextflow pipelines** for state-of-the-art pangenome-based variant calling:
 
 1. **`main_short_var.nf`** - Short variant calling (SNPs/indels) with vg Giraffe + Pangenome-Aware DeepVariant
 2. **`main_sv.nf`** - Structural variant genotyping with PanGenie
@@ -18,7 +18,7 @@ Both pipelines use the [HPRC v1.1 pangenome graph](https://github.com/human-pang
 
 ### Key Features
 
-- ✅ **HPRC v1.1 Support**: Full integration with latest HPRC pangenome graphs
+- ✅ **HPRC v1.1 Support**: Full integration with latest HPRC pangenome graphs with GRCh38 backbone
 - ✅ **Containerized**: All tools packaged in Docker/Singularity containers
 - ✅ **HPC-Ready**: Optimized for SLURM clusters with configurable profiles
 - ✅ **Biallelic Conversion**: Automatic post-processing for PanGenie outputs
@@ -96,6 +96,7 @@ echo "=========================================="
 echo "Download Complete!"
 echo "=========================================="
 ls -lh test_data/
+
 ```
 
 ### Step 3: Prepare Sample Sheet
@@ -147,20 +148,6 @@ profiles {
     singularity.autoMounts  = true
     singularity.pullTimeout = '5h'
 
-    conda.enabled           = false
-    docker.enabled          = false
-  }
-}
-```
-
-**Key configuration options:**
-- `executor.name`: Job scheduler type (`slurm`, `pbs`, `sge`, etc.)
-- `executor.account`: Your HPC project/account name
-- `process.clusterOptions`: Additional scheduler flags (time limits, partitions, QoS, etc.)
-- `executor.perCpuMemAllocation`: Uncomment if your cluster uses `--mem-per-cpu`
-
----
-
 ## Pipeline 1: Short Variant Calling (`main_short_var.nf`)
 
 Call SNPs and indels using vg Giraffe alignment and Pangenome-Aware DeepVariant.
@@ -199,6 +186,20 @@ nextflow run main_short_var.nf \
     --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
     --meta_csv samples.csv \
     --outdir results_short_variants
+```sing SAGA profile with Singularity
+nextflow run main_short_var.nf \
+    -profile saga,singularity \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --meta_csv samples.csv \
+    --outdir results_short_variants \
+    --output_bam true
+
+# Using your custom profile
+nextflow run main_short_var.nf \
+    -profile my_cluster,singularity \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --meta_csv samples.csv \
+    --outdir results_short_variants
 ```
 
 ### Parameters
@@ -219,29 +220,6 @@ results_short_variants/
 ├── reference/              # Extracted reference from graph
 │   ├── genome_ref.fa       # Reference with HPRC notation (GRCh38#0#chr1)
 │   ├── genome_ref.fa.fai
-│   └── chrom_rename.txt    # Map for converting HPRC → standard notation
-├── indexes/                # Graph indexes (reusable)
-│   ├── index.gbz
-│   ├── index.dist          # Distance index
-│   ├── index.min           # Minimizer index
-│   └── index.zipcodes      # Zipcode index for Giraffe
-├── alignments/             # GAM files and optional BAMs
-│   └── {sample}/
-│       ├── {sample}.gam
-│       ├── {sample}.bam         # Only if --output_bam true
-│       └── {sample}.bam.bai     # Only if --output_bam true
-└── variants/               # VCF files (HPRC notation)
-    └── {sample}/
-        ├── {sample}.hprc.vcf.gz        # VCF with HPRC chromosome names
-        ├── {sample}.hprc.vcf.gz.tbi
-        ├── {sample}.hprc.g.vcf.gz      # gVCF with HPRC chromosome names
-        └── {sample}.hprc.g.vcf.gz.tbi
-```
-
-**Note:** The FIX_VCF_CHROMS process is currently commented out. VCF files retain HPRC notation (GRCh38#0#chr1).
-
----
-
 ## Pipeline 2: SV Genotyping (`main_sv.nf`)
 
 Genotype structural variants using PanGenie with HPRC SV catalog.
@@ -281,23 +259,30 @@ nextflow run main_sv.nf \
     --hprc_pangenie_vcf test_data/pangenie_hprc.vcf \
     --meta_csv samples.csv \
     --outdir results_svs
+```C VCF → PanGenie Index (once)
+                ↓
+Sample Reads → PanGenie Genotype → VCF (SVs)
 ```
 
-### Parameters
+### Run the Pipeline
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--hprc_graph` | `test_data/hprc-v1.1-mc-grch38.gbz` | HPRC pangenome graph |
-| `--hprc_pangenie_vcf` | `test_data/pangenie_hprc.vcf` | HPRC SV catalog for PanGenie |
-| `--hprc_pangenie_callset_vcf` | `test_data/pangenie_hprc_callset.vcf` | Biallelic HPRC SV catalog |
-| `--meta_csv` | `samples.csv` | Sample sheet (sample,read1,read2) |
-| `--outdir` | `test_results` | Output directory |
-| `--ref_prefix` | `GRCh38` | Reference prefix for extraction |
+```bash
+# Using SAGA profile with Singularity
+nextflow run main_sv.nf \
+    -profile saga,singularity \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --hprc_pangenie_vcf test_data/pangenie_hprc.vcf \
+    --meta_csv samples.csv \
+    --outdir results_svs
 
-**Alternative SV Catalog:** The `data/` directory contains the 1000 Genomes Project ONT phased SV callset (`1000GP_ONT_shapeit5-phased-callset_final-vcf.phased.vcf.gz`), which can be used instead of the HPRC catalog. Integration is planned (see TODO list).
-
-### Output Structure
-
+# Using your custom profile
+nextflow run main_sv.nf \
+    -profile my_cluster,singularity \
+    --hprc_graph test_data/hprc-v1.1-mc-grch38.gbz \
+    --hprc_pangenie_vcf test_data/pangenie_hprc.vcf \
+    --meta_csv samples.csv \
+    --outdir results_svs
+```
 ```
 results_svs/
 ├── reference/              # Extracted reference (standard chr notation)
@@ -315,6 +300,22 @@ results_svs/
 ```
 
 **Note:** The biallelic conversion step uses `bin/convert-to-biallelic.py` which adaptively handles both compressed (.gz) and uncompressed VCF files.
+**Alternative SV Catalog:** The `data/` directory contains the 1000 Genomes Project ONT phased SV callset (`1000GP_ONT_shapeit5-phased-callset_final-vcf.phased.vcf.gz`), which can be used instead of the HPRC catalog. Integration is planned (see TODO list).
+
+### Output Structure
+
+```
+results_svs/
+├── reference/              # Extracted reference (standard chr notation)
+│   ├── genome_ref.fa       # Reference without HPRC notation (chr1, chr2...)
+│   ├── genome_ref.fa.fai
+│   └── chrom_rename.txt
+├── pangenie_index/         # PanGenie index (reusable)
+│   └── pangenie_index*     # Multiple index files
+└── genotypes/              # SV genotype VCFs
+    ├── {sample}_genotyping.vcf.gz
+    └── {sample}_genotyping.vcf.gz.tbi
+```
 
 ---
 
@@ -333,6 +334,7 @@ nextflow run main_sv.nf -profile my_cluster,singularity ...
 
 # Orion HPC with Singularity
 nextflow run main_short_var.nf -profile orion,singularity ...
+
 ```
 
 ### Profile Types
@@ -357,27 +359,6 @@ sample2,/path/to/sample2_R1.fq.gz,/path/to/sample2_R2.fq.gz
 **Requirements:**
 - Use **absolute paths** for read files
 - Gzipped FASTQ files (`.fq.gz` or `.fastq.gz`)
-- Paired-end reads required
-
----
-
-## Tools and Containers
-
-All tools are containerized for reproducibility and run via Singularity on HPC systems.
-
-### Short Variant Pipeline (`main_short_var.nf`)
-
-| Process | Container | Tool | Version |
-|---------|-----------|------|---------|
-| EXTRACT_REFERENCE | `quay.io/vgteam/vg:v1.65.0` | vg paths + samtools | v1.65.0 |
-| INDEX_GRAPH | `quay.io/vgteam/vg:v1.65.0` | vg index + vg minimizer | v1.65.0 |
-| GIRAFFE_ALIGN | `quay.io/vgteam/vg:v1.65.0` | vg giraffe | v1.65.0 |
-| PROJECT_BAM | `quay.io/vgteam/vg:v1.65.0` | vg surject + samtools | v1.65.0 |
-| CALL_SNPS_INDELS | `google/deepvariant:pangenome_aware_deepvariant-1.8.0` | Pangenome-Aware DeepVariant | 1.8.0 |
-| FIX_VCF_CHROMS* | `biocontainers/bcftools:1.20--h8b25389_0` | bcftools annotate | 1.20 |
-
-*Currently commented out in workflow
-
 ### SV Pipeline (`main_sv.nf`)
 
 | Process | Container | Tool | Version |
@@ -408,7 +389,28 @@ Converts PanGenie's multiallelic genotype output to biallelic format for downstr
 zcat multiallelic.vcf.gz | \
     python bin/convert-to-biallelic.py reference_biallelic.vcf.gz | \
     bgzip -c > output_biallelic.vcf.gz
-```
+```C systems.
+
+### Short Variant Pipeline (`main_short_var.nf`)
+
+| Process | Container | Tool | Version |
+|---------|-----------|------|---------|
+| EXTRACT_REFERENCE | `quay.io/vgteam/vg:v1.65.0` | vg paths + samtools | v1.65.0 |
+| EXTRACT_REFERENCE | `quay.io/vgteam/vg:v1.65.0` | vg paths + samtools | v1.65.0 |
+| INDEX_GRAPH | `quay.io/vgteam/vg:v1.65.0` | vg index + vg minimizer | v1.65.0 |
+| GIRAFFE_ALIGN | `quay.io/vgteam/vg:v1.65.0` | vg giraffe | v1.65.0 |
+| PROJECT_BAM | `quay.io/vgteam/vg:v1.65.0` | vg surject + samtools | v1.65.0 |
+| CALL_SNPS_INDELS | `google/deepvariant:pangenome_aware_deepvariant-1.8.0` | Pangenome-Aware DeepVariant | 1.8.0 |
+| FIX_VCF_CHROMS* | `biocontainers/bcftools:1.20--h8b25389_0` | bcftools annotate | 1.20 |
+
+*Currently commented out in workflow
+### SV Pipeline (`main_sv.nf`)
+
+| Process | Container | Tool | Version |
+|---------|-----------|------|---------|
+| EXTRACT_REFERENCE | `quay.io/vgteam/vg:v1.65.0` | vg paths + samtools | v1.65.0 |
+| PANGENIE_INDEX | `mgibio/pangenie:v4.2.1-bookworm` | PanGenie-index | v4.2.1 |
+| PANGENIE_GENOTYPE | `mgibio/pangenie:v4.2.1-bookworm` | PanGenie | v4.2.1 |
 
 ---
 
@@ -422,141 +424,112 @@ zcat multiallelic.vcf.gz | \
 | INDEX_GRAPH | 128 GB | 16 | ~2-4 hours |
 | GIRAFFE_ALIGN | 64 GB | 16 | ~4-8 hours per sample (30x), ~6-12 hours (50x) |
 | PROJECT_BAM | 128 GB | 16 | ~2-4 hours per sample (30x), ~3-6 hours (50x) |
+| CALL_SNPS_INDELS | 64 GB | 16 | ~8-12 hours per sample |
+| FIX_VCF_CHROMS | 16 GB | 4 | ~30 min per sample |
 | CALL_SNPS_INDELS | 64 GB | 16 | ~8-12 hours per sample (30x), ~16-20 hours (50x) |
 | FIX_VCF_CHROMS | 16 GB | 4 | ~30 min per sample (currently disabled) |
-
-### SV Pipeline (`main_sv.nf`)
 
 | Process | Memory | CPUs | Time (est.) |
 |---------|--------|------|-------------|
 | EXTRACT_REFERENCE | 32 GB | 8 | ~30 min |
 | PANGENIE_INDEX | 128 GB | 16 | ~2-4 hours |
 | PANGENIE_GENOTYPE | 64 GB | 16 | ~4-8 hours per sample |
-| CONVERT_TO_BIALLELIC | 16 GB | 4 | ~30 min per sample |
 
+**Note:** Times are estimates for 30x WGS data. Actual times vary based on coverage and cluster load.
 **Note:** Times are estimates for 30x WGS data. For 50x WGS, expect ~1.5-2x longer runtimes. Actual times vary based on coverage and cluster load.
-
----
-
-## Release Notes
-
-### Version 1.0 (December 2025)
-
-**Initial Release - HPRC v1.1 Support**
-
-#### Features
-- ✅ Short variant calling pipeline with vg Giraffe and Pangenome-Aware DeepVariant
-- ✅ SV genotyping pipeline with PanGenie
-- ✅ Biallelic conversion post-processing for PanGenie outputs
-- ✅ HPRC v1.1 pangenome graph support (GRCh38-based)
-- ✅ Containerized workflows (Docker/Singularity)
-- ✅ HPC cluster support with SLURM profiles
-- ✅ Comprehensive documentation and test scripts
-
-#### Known Limitations
-- FIX_VCF_CHROMS process disabled in short variant pipeline (outputs retain HPRC notation)
-- T2T-CHM13 pangenome support not yet implemented
-- 1000GP ONT SV catalog integration pending
-
-#### Test Data
-- HPRC v1.1 MC GRCh38 graph: 50GB
-- NA12878 test reads: 200M and 75M coverage datasets
-- HPRC SV catalogs for PanGenie
 
 ---
 
 ## TODO List
 
-### High Priority - v1.1 Roadmap
+### High Priority
 
-#### 1. Post-Processing Enhancements
-- [x] **PanGenie Biallelic Conversion** ✅ Implemented in v1.0
-  - Automatic conversion of multiallelic to biallelic format
-  - Adaptive VCF reader (compressed/uncompressed)
+#### 1. Post-Processing for Variant Calls
+- [ ] **PanGenie Output Processing**
+  - Add filtering step for low-confidence genotypes
+  - Implement coverage-based quality filtering
+  - Add process for merging multi-sample VCFs
+  - Generate summary statistics (GT counts, quality metrics)
   
-- [ ] **DeepVariant VCF Post-Processing**
+- [ ] **DeepVariant Output Processing**
   - Re-enable `FIX_VCF_CHROMS` process to convert HPRC notation to standard (chr1, chr2...)
   - Add BCFtools norm for left-alignment and splitting multiallelic sites
   - Implement VQSR or hard filtering based on QUAL/GQ thresholds
   - Add variant annotation (e.g., with VEP or SnpEff)
 
-- [ ] **Quality Control Metrics**
-  - Add filtering step for low-confidence genotypes in PanGenie
-  - Coverage-based quality filtering
-  - Generate summary statistics (GT counts, quality metrics)
-  - Multi-sample VCF merging support
-
-#### 2. Resource Optimization for High-Coverage Data
-- [ ] **50x WGS Testing and Optimization**
-  - Benchmark `main_short_var.nf` with 50x WGS samples
-  - Adjust `PROJECT_BAM` memory (may need 192 GB for 50x)
-  - Adjust `CALL_SNPS_INDELS` memory (may need 96-128 GB for 50x)
-  - Test `PANGENIE_GENOTYPE` with 50x data
+#### 2. Resource Optimization for 50x WGS
+- [ ] **Test and Optimize Memory Allocation**
+  - Test `main_short_var.nf` with 50x WGS samples
+  - Adjust `PROJECT_BAM` memory (currently 128 GB, may need 192 GB for 50x)
+  - Adjust `CALL_SNPS_INDELS` memory (currently 64 GB, may need 96-128 GB for 50x)
+  - Test `PANGENIE_GENOTYPE` with 50x data (currently 64 GB)
   
-- [ ] **CPU and Threading Optimization**
+- [ ] **CPU Optimization**
   - Profile CPU usage for each process
-  - Optimize samtools threading in `PROJECT_BAM`
-  - Test different `--num_shards` values for DeepVariant
+  - Optimize samtools threading in `PROJECT_BAM` (currently 3 threads)
+  - Test different `--num_shards` values for DeepVariant (currently = cpus)
 
 #### 3. T2T Pangenome Support
-- [ ] **T2T-CHM13 Backbone Implementation**
-  - Download and test T2T-based HPRC graph: `hprc-v1.1-mc-chm13.gbz`
+- [ ] **Add T2T-CHM13 Backbone Support**
+  - Download T2T-based HPRC graph: `hprc-v1.1-mc-chm13.gbz`
   - Add `--ref_prefix` parameter validation (GRCh38 vs CHM13)
   - Update `EXTRACT_REFERENCE` to handle T2T path names
   - Test chromosome naming conventions for T2T
-  - Document T2T-specific parameters and usage
+  - Document T2T-specific parameters in README
 
-### Medium Priority - v1.2+ Roadmap
+### Medium Priority
 
-#### 4. HPRC Version Updates
-- [ ] **Short Variant Pipeline** (Relatively Straightforward)
-  - Update to HPRC v1.2+ graphs when available
-  - Test compatibility with newer graph formats
+#### 4. Update to Newer HPRC Release
+- [ ] **Short Variant Pipeline (Relatively Easy)**
+  - Update default graph parameter to newer HPRC version when available
+  - Test compatibility with HPRC v1.2+ graphs
   - Update documentation with new download URLs
-  - Validate Giraffe index compatibility
+  - Validate that Giraffe indexes work with newer graphs
   
-- [ ] **SV Pipeline** (More Complex)
-  - Test PanGenie with updated HPRC SV catalogs
-  - Update `hprc_pangenie_vcf` to newer versions
-  - Validate SV genotyping accuracy
-  - May require PanGenie re-indexing
+- [ ] **SV Pipeline (More Complex)**
+  - Check if newer HPRC VCF format requires parser updates
+  - Test PanGenie compatibility with updated SV catalogs
+  - Update `hprc_pangenie_vcf` parameter to newer version
+  - Validate SV genotyping accuracy with updated catalogs
+  - May require re-indexing with PanGenie-index
 
-#### 5. 1000 Genomes Project ONT SV Integration
-**Note:** Most complex task - requires significant workflow changes
+#### 5. Integrate 1000GP ONT SV Catalog
+**HPRC SV Catalog (used by PanGenie):**
+- Ebert P, Audano PA, Zhu Q, et al. Haplotype-resolved diverse human genomes and integrated analysis of structural variation. *Science*. 2021;372(6537):eabf7117. doi:[10.1126/science.abf7117](https://doi.org/10.1126/science.abf7117)
 
-- [ ] **1KGP ONT VCF Support**
-  - Add `--sv_vcf` parameter (default: 1KGP ONT phased VCF from `data/`)
-  - Option to choose between HPRC VCF and 1KGP ONT VCF
+**1000 Genomes Project ONT SVs (available in `data/` directory):**
+- Ebert P, Audano PA, Zhu Q, et al. Haplotype-resolved diverse human genomes and integrated analysis of structural variation. *Nature*. 2025;637:696-706. doi:[10.1038/s41586-025-09290-7](https://doi.org/10.1038/s41586-025-09290-7)
+- [ ] **Add 1KGP ONT VCF Support**
+  - Create parameter: `--sv_vcf` (default: 1KGP ONT phased VCF from `data/`)
+  - Add option to choose between HPRC VCF and 1KGP ONT VCF
   - Implement VCF preprocessing:
     - Filter for high-quality SVs (PASS only)
     - Convert phased genotypes if needed
-    - Ensure chromosome naming consistency
+    - Ensure chromosome naming consistency (chr1 vs 1)
   
-- [ ] **PanGenie Workflow Updates**
+- [ ] **Update PanGenie Workflow**
   - Modify `PANGENIE_INDEX` to accept custom VCF input
-  - Add VCF format validation step
-  - Test with 1KGP ONT dataset (`data/1000GP_ONT_shapeit5-phased-callset_final-vcf.phased.vcf.gz`)
-  - Compare results: HPRC vs 1KGP catalogs
+  - Add validation step for VCF format compatibility
+  - Test with 1KGP ONT SV dataset (file exists in `data/1000GP_ONT_shapeit5-phased-callset_final-vcf.phased.vcf.gz`)
+  - Compare genotyping results between HPRC and 1KGP catalogs
   
-- [ ] **Hybrid Catalog Support**
-  - Merge HPRC and 1KGP SV catalogs
-  - Deduplicate overlapping SVs
-  - Create unified VCF for PanGenie
-  - Document performance and accuracy
+- [ ] **Create Hybrid Workflow**
+  - Option to merge HPRC and 1KGP SV catalogs
+  - Deduplicate overlapping SVs between catalogs
+  - Create unified VCF for PanGenie indexing
+  - Document merged catalog usage and performance
 
-### Low Priority - Future Enhancements
+### Low Priority
 
-#### 6. Advanced Features
-- [ ] Multi-sample joint genotyping for DeepVariant (GLnexus integration)
-- [ ] Per-chromosome parallelization for faster processing
-- [ ] MultiQC integration for QC dashboard
-- [ ] Native long-read support (PacBio HiFi, ONT)
-- [ ] Benchmark datasets and validation pipeline
-- [ ] Custom container builds (Docker/Singularity recipes)
-- [ ] Support for additional pangenome backbones (e.g., custom populations)
+#### 6. Additional Enhancements
+- [ ] Add multi-sample joint genotyping for DeepVariant (GLnexus)
+- [ ] Implement per-chromosome parallelization for faster processing
+- [ ] Add QC metrics dashboard (MultiQC integration)
+- [ ] Support for long-read data (PacBio HiFi, ONT)
+- [ ] Add benchmark datasets and validation pipeline
+- [ ] Create Docker/Singularity recipe for custom container builds
 
 ---
-
 ## Troubleshooting
 
 ### Common Issues
@@ -589,40 +562,6 @@ nextflow run main_short_var.nf -profile saga,singularity ...
 - Check file permissions on input data
 
 ---
-
-## Citations
-
-If you use these pipelines, please cite:
-
-### Pangenome Graph and HPRC
-
-**HPRC Pangenome:**
-- Liao WW, Asri M, Ebler J, et al. A draft human pangenome reference. *Nature*. 2023;617(7960):312-324. doi:[10.1038/s41586-023-05896-x](https://doi.org/10.1038/s41586-023-05896-x)
-
-### Short Variant Calling Tools
-
-**vg Giraffe (Graph Alignment):**
-- Monlong J, Ebler J, Eizenga JM, et al. Pangenome graph construction from genome sequences with structural variants. *bioRxiv*. 2025. doi:[10.1101/2025.09.29.678807](https://doi.org/10.1101/2025.09.29.678807)
-
-**Pangenome-Aware DeepVariant:**
-⚠️ **This is NOT standard DeepVariant** - it's specifically trained for pangenome graphs:
-- Chang PC, Bazak BR, Nattestad M, Coddington R, Eizenga JM, Carroll A, Paten B. Pangenome-Aware DeepVariant: Accurate SNP and Indel Calling on Whole Genome Sequences Aligned to Pangenome Reference Graphs. *medRxiv*. 2025. URL: [pubmed.ncbi.nlm.nih.gov/40501862](https://pubmed.ncbi.nlm.nih.gov/40501862)
-
-### SV Genotyping Tools
-
-**PanGenie:**
-- Ebler J, Ebert P, Clarke WE, et al. Pangenome-based genome inference allows efficient and accurate genotyping across a wide spectrum of variant classes. *Nature Genetics*. 2022;54(4):518-525. doi:[10.1038/s41588-022-01043-w](https://doi.org/10.1038/s41588-022-01043-w)
-
-**HPRC SV Catalog (used by PanGenie):**
-- Ebert P, Audano PA, Zhu Q, et al. Haplotype-resolved diverse human genomes and integrated analysis of structural variation. *Science*. 2021;372(6537):eabf7117. doi:[10.1126/science.abf7117](https://doi.org/10.1126/science.abf7117)
-
-**1000 Genomes Project ONT SVs (available in `data/` directory):**
-- Ebert P, Audano PA, Zhu Q, et al. Haplotype-resolved diverse human genomes and integrated analysis of structural variation. *Nature*. 2025;637:696-706. doi:[10.1038/s41586-025-09290-7](https://doi.org/10.1038/s41586-025-09290-7)
-
-### Nextflow
-
-- Di Tommaso P, Chatzou M, Floden EW, Barja PP, Palumbo E, Notredame C. Nextflow enables reproducible computational workflows. *Nature Biotechnology*. 2017;35(4):316-319. doi:[10.1038/nbt.3820](https://doi.org/10.1038/nbt.3820)
-
 ---
 
 ## Contributing
