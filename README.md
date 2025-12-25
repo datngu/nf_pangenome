@@ -9,7 +9,7 @@ Nextflow pipelines for pangenome-based variant calling using the HPRC v1.1 pange
 
 ## Overview
 
-This repository contains **two production-ready Nextflow pipelines** for state-of-the-art pangenome-based variant calling:
+This repository contains **two Nextflow pipelines** for state-of-the-art pangenome-based variant calling:
 
 1. **`main_short_var.nf`** - Short variant calling (SNPs/indels) with vg Giraffe + Pangenome-Aware DeepVariant
 2. **`main_sv.nf`** - Structural variant genotyping with PanGenie
