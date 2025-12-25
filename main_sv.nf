@@ -178,9 +178,9 @@ process CONVERT_TO_BIALLELIC {
     tag "${sample}"
     container 'docker://ndatth/ubuntu:22.04'
     memory '16 GB'
-    cpus 4
+    cpus 1
 
-    publishDir "${params.outdir}/genotypes_biallelic/", mode: 'copy'
+    publishDir "${params.outdir}/biallelic_genotypes/", mode: 'copy'
     
     input:
     tuple val(sample), path(genotype_vcf), path(genotype_tbi)
@@ -191,11 +191,13 @@ process CONVERT_TO_BIALLELIC {
     
     script:
     """
+
     # Convert to biallelic format
     zcat ${genotype_vcf} | \
         python ${projectDir}/bin/convert-to-biallelic.py ${biallelic_vcf} | \
         bgzip -c > ${sample}_genotyping_biallelic.vcf.gz
     
+
     # Index the output VCF
     tabix -p vcf ${sample}_genotyping_biallelic.vcf.gz
     """
