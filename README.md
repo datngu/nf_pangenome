@@ -179,7 +179,7 @@ Sample Reads → Giraffe Align (GAM) → Project BAM → DeepVariant → VCF (SN
 3. **GIRAFFE_ALIGN** - Align reads to pangenome with vg Giraffe
 4. **PROJECT_BAM** - Project GAM to BAM with vg surject
 5. **CALL_SNPS_INDELS** - Call variants with Pangenome-Aware DeepVariant
-6. **FIX_VCF_CHROMS** - Convert HPRC notation to standard (currently disabled)
+6. **FIX_VCF_CHROMS** - Convert HPRC notation to standard chromosome names
 
 ### Run the Pipeline
 
@@ -230,15 +230,19 @@ results_short_variants/
 │       ├── {sample}.gam
 │       ├── {sample}.bam         # Only if --output_bam true
 │       └── {sample}.bam.bai     # Only if --output_bam true
-└── variants/               # VCF files (HPRC notation)
+└── variants/               # VCF files (standard chromosome notation)
     └── {sample}/
-        ├── {sample}.hprc.vcf.gz        # VCF with HPRC chromosome names
+        ├── {sample}.hprc.vcf.gz              # Intermediate VCF with HPRC notation
         ├── {sample}.hprc.vcf.gz.tbi
-        ├── {sample}.hprc.g.vcf.gz      # gVCF with HPRC chromosome names
-        └── {sample}.hprc.g.vcf.gz.tbi
+        ├── {sample}.hprc.g.vcf.gz            # Intermediate gVCF with HPRC notation
+        ├── {sample}.hprc.g.vcf.gz.tbi
+        ├── {sample}.deepvariant.vcf.gz       # Final VCF with standard chr names
+        ├── {sample}.deepvariant.vcf.gz.tbi
+        ├── {sample}.deepvariant.g.vcf.gz     # Final gVCF with standard chr names
+        └── {sample}.deepvariant.g.vcf.gz.tbi
 ```
 
-**Note:** The FIX_VCF_CHROMS process is currently commented out. VCF files retain HPRC notation (GRCh38#0#chr1).
+**Note:** The FIX_VCF_CHROMS process converts HPRC notation (GRCh38#0#chr1) to standard notation (chr1).
 
 ---
 
@@ -374,9 +378,7 @@ All tools are containerized for reproducibility and run via Singularity on HPC s
 | GIRAFFE_ALIGN | `quay.io/vgteam/vg:v1.65.0` | vg giraffe | v1.65.0 |
 | PROJECT_BAM | `quay.io/vgteam/vg:v1.65.0` | vg surject + samtools | v1.65.0 |
 | CALL_SNPS_INDELS | `google/deepvariant:pangenome_aware_deepvariant-1.8.0` | Pangenome-Aware DeepVariant | 1.8.0 |
-| FIX_VCF_CHROMS* | `biocontainers/bcftools:1.20--h8b25389_0` | bcftools annotate | 1.20 |
-
-*Currently commented out in workflow
+| FIX_VCF_CHROMS | `biocontainers/bcftools:1.20--h8b25389_0` | bcftools annotate | 1.20 |
 
 ### SV Pipeline (`main_sv.nf`)
 
@@ -386,29 +388,6 @@ All tools are containerized for reproducibility and run via Singularity on HPC s
 | PANGENIE_INDEX | `mgibio/pangenie:v4.2.1-bookworm` | PanGenie-index | v4.2.1 |
 | PANGENIE_GENOTYPE | `mgibio/pangenie:v4.2.1-bookworm` | PanGenie | v4.2.1 |
 | CONVERT_TO_BIALLELIC | `python:3.9-slim` | Custom Python script | v1.0 |
-
----
-
-## Utilities
-
-### Biallelic Conversion Script
-
-**Location:** `bin/convert-to-biallelic.py`
-
-Converts PanGenie's multiallelic genotype output to biallelic format for downstream analysis.
-
-**Features:**
-- Adaptively reads both compressed (.gz) and uncompressed VCF files
-- Splits multiallelic variants into separate biallelic records
-- Preserves genotype (GT) and quality (GQ) information
-- Outputs compressed and indexed VCF
-
-**Usage:**
-```bash
-zcat multiallelic.vcf.gz | \
-    python bin/convert-to-biallelic.py reference_biallelic.vcf.gz | \
-    bgzip -c > output_biallelic.vcf.gz
-```
 
 ---
 
@@ -423,7 +402,7 @@ zcat multiallelic.vcf.gz | \
 | GIRAFFE_ALIGN | 64 GB | 16 | ~4-8 hours per sample (30x), ~6-12 hours (50x) |
 | PROJECT_BAM | 128 GB | 16 | ~2-4 hours per sample (30x), ~3-6 hours (50x) |
 | CALL_SNPS_INDELS | 64 GB | 16 | ~8-12 hours per sample (30x), ~16-20 hours (50x) |
-| FIX_VCF_CHROMS | 16 GB | 4 | ~30 min per sample (currently disabled) |
+| FIX_VCF_CHROMS | 16 GB | 4 | ~30 min per sample |
 
 ### SV Pipeline (`main_sv.nf`)
 
@@ -454,7 +433,6 @@ zcat multiallelic.vcf.gz | \
 - ✅ Comprehensive documentation and test scripts
 
 #### Known Limitations
-- FIX_VCF_CHROMS process disabled in short variant pipeline (outputs retain HPRC notation)
 - T2T-CHM13 pangenome support not yet implemented
 - 1000GP ONT SV catalog integration pending
 
@@ -475,7 +453,6 @@ zcat multiallelic.vcf.gz | \
   - Adaptive VCF reader (compressed/uncompressed)
   
 - [ ] **DeepVariant VCF Post-Processing**
-  - Re-enable `FIX_VCF_CHROMS` process to convert HPRC notation to standard (chr1, chr2...)
   - Add BCFtools norm for left-alignment and splitting multiallelic sites
   - Implement VQSR or hard filtering based on QUAL/GQ thresholds
   - Add variant annotation (e.g., with VEP or SnpEff)
@@ -606,7 +583,7 @@ If you use these pipelines, please cite:
 
 **Pangenome-Aware DeepVariant:**
 ⚠️ **This is NOT standard DeepVariant** - it's specifically trained for pangenome graphs:
-- Chang PC, Bazak BR, Nattestad M, Coddington R, Eizenga JM, Carroll A, Paten B. Pangenome-Aware DeepVariant: Accurate SNP and Indel Calling on Whole Genome Sequences Aligned to Pangenome Reference Graphs. *medRxiv*. 2025. URL: [pubmed.ncbi.nlm.nih.gov/40501862](https://pubmed.ncbi.nlm.nih.gov/40501862)
+- Asri M, Chang PC, Mier JC, Sirén J, Eskandar P, Kolesnikov A, Cook DE, Bzikadze AV, Nattestad M, Baid G, Eizenga JM, Novak AM, Lorig-Roach R, Hickey G, Carroll A, Paten B. Pangenome-aware DeepVariant. *bioRxiv*. 2025. doi:[10.1101/2025.06.05.657102](https://doi.org/10.1101/2025.06.05.657102) PMID: [40501862](https://pubmed.ncbi.nlm.nih.gov/40501862)
 
 ### SV Genotyping Tools
 
@@ -656,7 +633,6 @@ This pipeline is released under the MIT License. See [LICENSE](LICENSE) file for
 **Dat T. Nguyen**  
 Contact: ndat@utexas.edu  
 GitHub: [datngu](https://github.com/datngu)  
-University of Texas at Austin
 
 ---
 
