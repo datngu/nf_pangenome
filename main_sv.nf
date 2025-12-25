@@ -176,7 +176,7 @@ process PANGENIE_GENOTYPE {
  */
 process CONVERT_TO_BIALLELIC {
     tag "${sample}"
-    container 'docker://python:3.9-slim'
+    container 'docker://ndatth/ubuntu:22.04'
     memory '16 GB'
     cpus 4
 
